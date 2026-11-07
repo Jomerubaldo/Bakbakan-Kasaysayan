@@ -1,19 +1,27 @@
 package com.bakbakan.screens;
 
+import com.bakbakan.ai.EnemyAI;
 import com.bakbakan.assets.AssetManager;
 import com.bakbakan.assets.SpriteProvider;
 import com.bakbakan.combat.CombatConstants;
 import com.bakbakan.combat.CombatSystem;
 import com.bakbakan.combat.InputHandler;
+import com.bakbakan.combat.RoundManager;
 import com.bakbakan.combat.SkillSystem;
+import com.bakbakan.entities.EnemyData;
 import com.bakbakan.entities.Fighter;
 import com.bakbakan.entities.GameSession;
 import com.bakbakan.entities.HeroData;
 import com.bakbakan.events.GameEventBus;
+import com.bakbakan.events.GameOverEvent;
+import com.bakbakan.events.RoundEndEvent;
 import com.bakbakan.events.ScreenChangeEvent;
 import com.bakbakan.events.SoundRequestEvent;
+import com.bakbakan.events.TimeOutEvent;
+import com.bakbakan.events.VictoryEvent;
 import com.bakbakan.ui.Hud;
 import com.bakbakan.util.GameConfig;
+import javafx.event.EventHandler;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyCode;
@@ -47,14 +55,26 @@ public class FightScreen implements Screen {
     private final StackPane root;
     private final Canvas canvas;
 
+    private final EventHandler<RoundEndEvent> roundEndHandler = this::onRoundEnd;
+    private final EventHandler<GameOverEvent> gameOverHandler = this::onGameOver;
+    private final EventHandler<VictoryEvent> victoryHandler = this::onVictory;
+    private final EventHandler<TimeOutEvent> timeOutHandler = this::onTimeOut;
+
     private Fighter player;
     private Fighter opponent;
+    private EnemyData enemyData;
+    private EnemyAI enemyAI;
+    private RoundManager roundManager;
     private Hud hud;
     private double elapsed;
     private boolean backHovered;
     private boolean menuHovered;
     private double noManaTimer;
     private double notReadyTimer;
+    private double timeOutTimer;
+    private double resultTimer;
+    private String resultScreen;
+    private boolean resultHandlersAttached;
 
     public FightScreen(GameEventBus bus, GameSession session, AssetManager assets) {
         this.bus = bus;
@@ -82,35 +102,54 @@ public class FightScreen implements Screen {
         HeroData hero = session.hasSelectedHero()
                 ? session.getSelectedHero()
                 : HeroData.ALL.get(0);
+        int round = session.getCurrentRound();
+        enemyData = EnemyData.forRound(round, hero);
 
         player = new Fighter(PLAYER_ID, hero, 380, true, bus);
-        opponent = new Fighter(OPPONENT_ID, HeroData.DUMMY, 900, false, bus);
+        opponent = new Fighter(OPPONENT_ID, enemyData.moveset(), 900, false, bus,
+                enemyData.maxHealth(), enemyData.damageMultiplier());
 
         if (hud != null) {
             hud.detach(bus);
         }
-        hud = new Hud(PLAYER_ID, OPPONENT_ID, hero.name(), "Training Dummy");
-        hud.reset();
+        hud = new Hud(PLAYER_ID, OPPONENT_ID, hero.name(), enemyData.name(),
+                CombatConstants.MAX_HEALTH, enemyData.maxHealth(), enemyData.boss());
         hud.attach(bus);
 
         skills.clear();
         input.clear();
+        attachResultHandlers();
+
+        roundManager = new RoundManager(bus, session);
+        roundManager.attach();
+        enemyAI = new EnemyAI(opponent, player, skills, round);
+        roundManager.startRound(player, opponent, enemyData);
+
         elapsed = 0;
         backHovered = false;
         menuHovered = false;
         noManaTimer = 0;
         notReadyTimer = 0;
+        timeOutTimer = 0;
+        resultTimer = 0;
+        resultScreen = null;
         bus.fire(new SoundRequestEvent("battle", true));
         render();
     }
 
     @Override
     public void onHide() {
+        detachResultHandlers();
+        if (roundManager != null) {
+            roundManager.detach();
+            roundManager = null;
+        }
         if (hud != null) {
             hud.detach(bus);
         }
         skills.clear();
         input.clear();
+        enemyAI = null;
     }
 
     @Override
@@ -120,6 +159,25 @@ public class FightScreen implements Screen {
         }
 
         elapsed += dt;
+        noManaTimer = Math.max(0, noManaTimer - dt);
+        notReadyTimer = Math.max(0, notReadyTimer - dt);
+        timeOutTimer = Math.max(0, timeOutTimer - dt);
+
+        if (resultScreen != null) {
+            resultTimer -= dt;
+            input.endFrame();
+            if (resultTimer <= 0) {
+                String target = resultScreen;
+                resultScreen = null;
+                bus.fire(new ScreenChangeEvent(getName(), target, true));
+            }
+            return;
+        }
+
+        if (roundManager == null || !roundManager.isRunning()) {
+            input.endFrame();
+            return;
+        }
 
         double direction = 0;
         if (input.isDown(KeyCode.D) || input.isDown(KeyCode.RIGHT)) {
@@ -161,20 +219,83 @@ public class FightScreen implements Screen {
             }
         }
 
-        player.update(dt, opponent.getX());
+        if (enemyAI != null) {
+            enemyAI.update(dt);
+        }
 
-        opponent.setMoveInput(0, false, false);
+        player.update(dt, opponent.getX());
         opponent.update(dt, player.getX());
 
         separateFighters();
-        combat.resolve(player, opponent);
-        combat.resolve(opponent, player);
-        skills.update(dt, player, opponent);
-
-        noManaTimer = Math.max(0, noManaTimer - dt);
-        notReadyTimer = Math.max(0, notReadyTimer - dt);
+        if (resultScreen == null) {
+            combat.resolve(player, opponent);
+        }
+        if (resultScreen == null) {
+            combat.resolve(opponent, player);
+        }
+        if (resultScreen == null) {
+            skills.update(dt, player, opponent);
+        }
+        if (roundManager != null) {
+            roundManager.update(dt);
+        }
 
         input.endFrame();
+    }
+
+    private void attachResultHandlers() {
+        if (resultHandlersAttached) {
+            return;
+        }
+        bus.register(RoundEndEvent.ROUND_END, roundEndHandler);
+        bus.register(GameOverEvent.GAME_OVER, gameOverHandler);
+        bus.register(VictoryEvent.VICTORY, victoryHandler);
+        bus.register(TimeOutEvent.TIME_OUT, timeOutHandler);
+        resultHandlersAttached = true;
+    }
+
+    private void detachResultHandlers() {
+        if (!resultHandlersAttached) {
+            return;
+        }
+        bus.unregister(RoundEndEvent.ROUND_END, roundEndHandler);
+        bus.unregister(GameOverEvent.GAME_OVER, gameOverHandler);
+        bus.unregister(VictoryEvent.VICTORY, victoryHandler);
+        bus.unregister(TimeOutEvent.TIME_OUT, timeOutHandler);
+        resultHandlersAttached = false;
+    }
+
+    private void onRoundEnd(RoundEndEvent event) {
+        if (resultScreen != null) {
+            return;
+        }
+        if (!event.isPlayerWon()) {
+            startResult("GameOver");
+        } else if (event.getRoundNumber() >= CombatConstants.TOTAL_ROUNDS) {
+            startResult("Victory");
+        } else {
+            startResult("RoundWin");
+        }
+    }
+
+    private void onGameOver(GameOverEvent event) {
+        startResult("GameOver");
+    }
+
+    private void onVictory(VictoryEvent event) {
+        startResult("Victory");
+    }
+
+    private void onTimeOut(TimeOutEvent event) {
+        timeOutTimer = 1.4;
+    }
+
+    private void startResult(String screen) {
+        if (resultScreen != null) {
+            return;
+        }
+        resultScreen = screen;
+        resultTimer = 1.35;
     }
 
     private void separateFighters() {
@@ -276,6 +397,10 @@ public class FightScreen implements Screen {
     }
 
     private void drawFightBanner(GraphicsContext gc) {
+        if (enemyData != null && enemyData.boss()) {
+            drawBossBanner(gc);
+            return;
+        }
         if (elapsed >= 1.2) {
             return;
         }
@@ -288,9 +413,48 @@ public class FightScreen implements Screen {
         gc.fillText("FIGHT!", GameConfig.WIDTH / 2.0, 320);
     }
 
+    private void drawBossBanner(GraphicsContext gc) {
+        if (elapsed >= 3.2) {
+            return;
+        }
+        double alpha = elapsed < 0.6
+                ? Math.min(1, elapsed / 0.35)
+                : elapsed < 2.5
+                ? 1
+                : Math.max(0, 1 - (elapsed - 2.5) / 0.7);
+
+        gc.setFill(Color.web("#0a0f1e", 0.58 * alpha));
+        gc.fillRect(0, 178, GameConfig.WIDTH, 168);
+        gc.setStroke(Color.web("#ff6b6b", 0.8 * alpha));
+        gc.setLineWidth(3);
+        gc.strokeLine(240, 346, GameConfig.WIDTH - 240, 346);
+
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.setFill(Color.web("#ff6b6b", alpha));
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 76));
+        gc.fillText("BOSS", GameConfig.WIDTH / 2.0, 262);
+
+        gc.setFill(Color.web("#f4c542", alpha));
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 25));
+        gc.fillText(enemyData.name(), GameConfig.WIDTH / 2.0, 302);
+
+        gc.setFill(Color.web("#e8e8f0", 0.9 * alpha));
+        gc.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 14));
+        gc.fillText("ROUND 5 - FINAL BATTLE", GameConfig.WIDTH / 2.0, 330);
+    }
+
     private void drawCombatFeedback(GraphicsContext gc) {
         if (player == null) {
             return;
+        }
+        if (timeOutTimer > 0) {
+            double alpha = Math.min(1, timeOutTimer / 0.25);
+            gc.setTextAlign(TextAlignment.CENTER);
+            gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 54));
+            gc.setFill(Color.web("#0a0f1e", alpha * 0.8));
+            gc.fillText("TIME OUT", GameConfig.WIDTH / 2.0 + 3, 303);
+            gc.setFill(Color.web("#f4c542", alpha));
+            gc.fillText("TIME OUT", GameConfig.WIDTH / 2.0, 300);
         }
         if (noManaTimer > 0) {
             drawFloatingText(gc, "NO MANA", player.getX(), player.getY() - 190,

@@ -60,21 +60,24 @@ public final class Projectile {
     }
 
     public static Projectile ink(Fighter owner, boolean facingRight) {
-        return new Projectile(Kind.INK, owner, CombatConstants.SKILL_DAMAGE_INK, false,
+        return new Projectile(Kind.INK, owner,
+                owner.scaleDamage(CombatConstants.SKILL_DAMAGE_INK), false,
                 startX(owner, facingRight), owner.getY() - 70,
                 speed(480, facingRight), 0,
                 34, 34, 1.0, 5, facingRight);
     }
 
     public static Projectile rifle(Fighter owner, boolean facingRight) {
-        return new Projectile(Kind.RIFLE, owner, CombatConstants.SKILL_DAMAGE_RIFLE, true,
+        return new Projectile(Kind.RIFLE, owner,
+                owner.scaleDamage(CombatConstants.SKILL_DAMAGE_RIFLE), true,
                 startX(owner, facingRight), owner.getY() - 112,
                 speed(950, facingRight), 0,
                 36, 10, 1.2, 0, facingRight);
     }
 
     public static Projectile quill(Fighter owner, boolean facingRight) {
-        return new Projectile(Kind.QUILL, owner, CombatConstants.SKILL_DAMAGE_QUILL, true,
+        return new Projectile(Kind.QUILL, owner,
+                owner.scaleDamage(CombatConstants.SKILL_DAMAGE_QUILL), true,
                 startX(owner, facingRight), owner.getY() - 118,
                 speed(620, facingRight), 0,
                 32, 14, 1.2, 0, facingRight);
@@ -82,7 +85,7 @@ public final class Projectile {
 
     public static Projectile kampilanWave(Fighter owner, boolean facingRight) {
         return new Projectile(Kind.KAMPILAN_WAVE, owner,
-                CombatConstants.SKILL_DAMAGE_KAMPILAN_WAVE, false,
+                owner.scaleDamage(CombatConstants.SKILL_DAMAGE_KAMPILAN_WAVE), false,
                 startX(owner, facingRight), owner.getY() - 50,
                 speed(430, facingRight), 0,
                 64, 54, 1.2, 0, facingRight);
@@ -90,7 +93,7 @@ public final class Projectile {
 
     public static Projectile tidalWave(Fighter owner, boolean facingRight) {
         return new Projectile(Kind.TIDAL_WAVE, owner,
-                CombatConstants.SPECIAL_DAMAGE_TIDAL_WAVE, false,
+                owner.scaleDamage(CombatConstants.SPECIAL_DAMAGE_TIDAL_WAVE), false,
                 startX(owner, facingRight), owner.getY() - 100,
                 speed(360, facingRight), 0,
                 120, 100, 1.6, 0, facingRight);

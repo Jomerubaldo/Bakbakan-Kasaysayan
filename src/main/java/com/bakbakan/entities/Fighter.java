@@ -14,8 +14,10 @@ public class Fighter extends Entity {
     private final HeroData hero;
     private final boolean playerControlled;
     private final GameEventBus bus;
+    private final double maxHealth;
+    private final double damageMultiplier;
 
-    private double health = CombatConstants.MAX_HEALTH;
+    private double health;
     private double mana = CombatConstants.MAX_MANA;
     private double special;
     private double manaAccumulator;
@@ -43,10 +45,47 @@ public class Fighter extends Entity {
     private double walkPhase;
 
     public Fighter(String id, HeroData hero, double x, boolean playerControlled, GameEventBus bus) {
+        this(id, hero, x, playerControlled, bus,
+                CombatConstants.MAX_HEALTH, 1.0);
+    }
+
+    public Fighter(String id, HeroData hero, double x, boolean playerControlled,
+                   GameEventBus bus, double maxHealth, double damageMultiplier) {
         super(id, x, CombatConstants.GROUND_Y);
         this.hero = hero;
         this.playerControlled = playerControlled;
         this.bus = bus;
+        this.maxHealth = Math.max(1, maxHealth);
+        this.damageMultiplier = Math.max(0, damageMultiplier);
+        this.health = this.maxHealth;
+    }
+
+    public void resetForRound() {
+        health = maxHealth;
+        mana = CombatConstants.MAX_MANA;
+        special = 0;
+        manaAccumulator = 0;
+        specialReadyAnnounced = false;
+
+        velocityX = 0;
+        velocityY = 0;
+        onGround = true;
+        ducking = false;
+        blocking = false;
+
+        moveDirection = 0;
+        duckInput = false;
+        blockInput = false;
+
+        state = FighterState.IDLE;
+        stateTime = 0;
+        attackCooldown = 0;
+        attackTime = 0;
+        actionLock = 0;
+        hitLanded = false;
+        hitStun = 0;
+        hitFlash = 0;
+        walkPhase = 0;
     }
 
     public void setMoveInput(double direction, boolean duck, boolean block) {
@@ -327,8 +366,12 @@ public class Fighter extends Entity {
     }
 
     public double getAttackDamage() {
-        return CombatConstants.BASE_ATTACK_DAMAGE
-                + hero.damage() * CombatConstants.ATTACK_DAMAGE_SCALING;
+        return scaleDamage(CombatConstants.BASE_ATTACK_DAMAGE
+                + hero.damage() * CombatConstants.ATTACK_DAMAGE_SCALING);
+    }
+
+    public double scaleDamage(double baseDamage) {
+        return baseDamage * damageMultiplier;
     }
 
     public double getCurrentHeight() {
@@ -345,6 +388,14 @@ public class Fighter extends Entity {
 
     public double getHealth() {
         return health;
+    }
+
+    public double getMaxHealth() {
+        return maxHealth;
+    }
+
+    public double getDamageMultiplier() {
+        return damageMultiplier;
     }
 
     public double getMana() {

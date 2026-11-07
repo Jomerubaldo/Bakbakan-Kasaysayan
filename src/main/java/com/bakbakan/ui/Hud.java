@@ -5,8 +5,11 @@ import com.bakbakan.events.DamageEvent;
 import com.bakbakan.events.GameEventBus;
 import com.bakbakan.events.HitEvent;
 import com.bakbakan.events.ManaChangedEvent;
+import com.bakbakan.events.RoundStartEvent;
 import com.bakbakan.events.SpecialReadyEvent;
 import com.bakbakan.events.SpecialUsedEvent;
+import com.bakbakan.events.TimeOutEvent;
+import com.bakbakan.events.TimerTickEvent;
 import com.bakbakan.util.GameConfig;
 import javafx.event.EventHandler;
 import javafx.scene.canvas.GraphicsContext;
@@ -30,27 +33,45 @@ public class Hud {
     private final String opponentId;
     private final String playerName;
     private final String opponentName;
+    private final double playerMaxHealth;
+    private final double opponentMaxHealth;
+    private final boolean opponentBoss;
     private final EventHandler<DamageEvent> damageHandler = this::onDamage;
     private final EventHandler<ManaChangedEvent> manaHandler = this::onMana;
     private final EventHandler<HitEvent> hitHandler = this::onHit;
     private final EventHandler<SpecialReadyEvent> specialReadyHandler = this::onSpecialReady;
     private final EventHandler<SpecialUsedEvent> specialUsedHandler = this::onSpecialUsed;
+    private final EventHandler<RoundStartEvent> roundStartHandler = this::onRoundStart;
+    private final EventHandler<TimerTickEvent> timerTickHandler = this::onTimerTick;
+    private final EventHandler<TimeOutEvent> timeOutHandler = this::onTimeOut;
 
-    private double playerHealth = CombatConstants.MAX_HEALTH;
-    private double opponentHealth = CombatConstants.MAX_HEALTH;
+    private double playerHealth;
+    private double opponentHealth;
     private double playerMana = CombatConstants.MAX_MANA;
     private double opponentMana = CombatConstants.MAX_MANA;
     private double playerSpecial;
     private double opponentSpecial;
     private boolean playerSpecialReady;
     private boolean opponentSpecialReady;
+    private int roundNumber = 1;
+    private int secondsRemaining = CombatConstants.ROUND_TIME_SECONDS;
     private boolean attached;
 
     public Hud(String playerId, String opponentId, String playerName, String opponentName) {
+        this(playerId, opponentId, playerName, opponentName,
+                CombatConstants.MAX_HEALTH, CombatConstants.MAX_HEALTH, false);
+    }
+
+    public Hud(String playerId, String opponentId, String playerName, String opponentName,
+               double playerMaxHealth, double opponentMaxHealth, boolean opponentBoss) {
         this.playerId = playerId;
         this.opponentId = opponentId;
         this.playerName = playerName;
         this.opponentName = opponentName;
+        this.playerMaxHealth = Math.max(1, playerMaxHealth);
+        this.opponentMaxHealth = Math.max(1, opponentMaxHealth);
+        this.opponentBoss = opponentBoss;
+        reset();
     }
 
     public void attach(GameEventBus bus) {
@@ -62,6 +83,9 @@ public class Hud {
         bus.register(HitEvent.HIT, hitHandler);
         bus.register(SpecialReadyEvent.SPECIAL_READY, specialReadyHandler);
         bus.register(SpecialUsedEvent.SPECIAL_USED, specialUsedHandler);
+        bus.register(RoundStartEvent.ROUND_START, roundStartHandler);
+        bus.register(TimerTickEvent.TIMER_TICK, timerTickHandler);
+        bus.register(TimeOutEvent.TIME_OUT, timeOutHandler);
         attached = true;
     }
 
@@ -74,26 +98,51 @@ public class Hud {
         bus.unregister(HitEvent.HIT, hitHandler);
         bus.unregister(SpecialReadyEvent.SPECIAL_READY, specialReadyHandler);
         bus.unregister(SpecialUsedEvent.SPECIAL_USED, specialUsedHandler);
+        bus.unregister(RoundStartEvent.ROUND_START, roundStartHandler);
+        bus.unregister(TimerTickEvent.TIMER_TICK, timerTickHandler);
+        bus.unregister(TimeOutEvent.TIME_OUT, timeOutHandler);
         attached = false;
     }
 
     public void reset() {
-        playerHealth = CombatConstants.MAX_HEALTH;
-        opponentHealth = CombatConstants.MAX_HEALTH;
+        playerHealth = playerMaxHealth;
+        opponentHealth = opponentMaxHealth;
         playerMana = CombatConstants.MAX_MANA;
         opponentMana = CombatConstants.MAX_MANA;
         playerSpecial = 0;
         opponentSpecial = 0;
         playerSpecialReady = false;
         opponentSpecialReady = false;
+        roundNumber = 1;
+        secondsRemaining = CombatConstants.ROUND_TIME_SECONDS;
+    }
+
+    private void onRoundStart(RoundStartEvent event) {
+        roundNumber = event.getRoundNumber();
+        playerHealth = playerMaxHealth;
+        opponentHealth = opponentMaxHealth;
+        playerMana = CombatConstants.MAX_MANA;
+        opponentMana = CombatConstants.MAX_MANA;
+        playerSpecial = 0;
+        opponentSpecial = 0;
+        playerSpecialReady = false;
+        opponentSpecialReady = false;
+        secondsRemaining = CombatConstants.ROUND_TIME_SECONDS;
+    }
+
+    private void onTimerTick(TimerTickEvent event) {
+        secondsRemaining = Math.max(0, event.getSecondsRemaining());
+    }
+
+    private void onTimeOut(TimeOutEvent event) {
+        secondsRemaining = 0;
     }
 
     private void onDamage(DamageEvent event) {
-        double health = clamp(event.getRemainingHealth(), 0, CombatConstants.MAX_HEALTH);
         if (playerId.equals(event.getFighterId())) {
-            playerHealth = health;
+            playerHealth = clamp(event.getRemainingHealth(), 0, playerMaxHealth);
         } else if (opponentId.equals(event.getFighterId())) {
-            opponentHealth = health;
+            opponentHealth = clamp(event.getRemainingHealth(), 0, opponentMaxHealth);
         }
     }
 
@@ -162,20 +211,29 @@ public class Hud {
 
         gc.setTextAlign(TextAlignment.RIGHT);
         gc.fillText(opponentName, RIGHT_X + BAR_WIDTH, 30);
+        if (opponentBoss) {
+            gc.setFill(Color.web("#ff6b6b"));
+            gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
+            gc.fillText("BOSS", RIGHT_X + BAR_WIDTH, 16);
+        }
 
         gc.setTextAlign(TextAlignment.CENTER);
+        gc.setFill(Color.web("#9aa4c0"));
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
+        gc.fillText("ROUND " + roundNumber + " / " + CombatConstants.TOTAL_ROUNDS,
+                GameConfig.WIDTH / 2.0, 24);
         gc.setFill(Color.web("#f4c542"));
         gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 24));
-        gc.fillText("VS", GameConfig.WIDTH / 2.0, 66);
+        gc.fillText(formatTime(secondsRemaining), GameConfig.WIDTH / 2.0, 58);
 
         drawBar(gc, LEFT_X, HEALTH_Y, BAR_WIDTH, HEALTH_HEIGHT,
-                playerHealth / CombatConstants.MAX_HEALTH,
+                playerHealth / playerMaxHealth,
                 Color.web("#4cd97b"), false, false);
         drawBar(gc, RIGHT_X, HEALTH_Y, BAR_WIDTH, HEALTH_HEIGHT,
-                opponentHealth / CombatConstants.MAX_HEALTH,
+                opponentHealth / opponentMaxHealth,
                 Color.web("#e74c3c"), true, false);
-        drawHealthText(gc, LEFT_X + BAR_WIDTH / 2.0, 80, playerHealth);
-        drawHealthText(gc, RIGHT_X + BAR_WIDTH / 2.0, 80, opponentHealth);
+        drawHealthText(gc, LEFT_X + BAR_WIDTH / 2.0, 80, playerHealth, playerMaxHealth);
+        drawHealthText(gc, RIGHT_X + BAR_WIDTH / 2.0, 80, opponentHealth, opponentMaxHealth);
 
         drawBar(gc, LEFT_X, MANA_Y, BAR_WIDTH, SMALL_HEIGHT,
                 playerMana / CombatConstants.MAX_MANA,
@@ -233,12 +291,18 @@ public class Hud {
         }
     }
 
-    private void drawHealthText(GraphicsContext gc, double centerX, double y, double health) {
+    private void drawHealthText(GraphicsContext gc, double centerX, double y,
+                                double health, double maxHealth) {
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setFill(Color.web("#b9c2da"));
         gc.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 12));
-        gc.fillText((int) Math.ceil(health) + " / " + (int) CombatConstants.MAX_HEALTH,
+        gc.fillText((int) Math.ceil(health) + " / " + (int) maxHealth,
                 centerX, y);
+    }
+
+    private static String formatTime(int totalSeconds) {
+        int clamped = Math.max(0, totalSeconds);
+        return (clamped / 60) + ":" + String.format("%02d", clamped % 60);
     }
 
     private void drawLabel(GraphicsContext gc, String text, double x, double y,

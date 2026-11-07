@@ -8,6 +8,7 @@ import com.bakbakan.screens.FightScreen;
 import com.bakbakan.screens.HeroSelectScreen;
 import com.bakbakan.screens.LoadingScreen;
 import com.bakbakan.screens.MainMenuScreen;
+import com.bakbakan.screens.ResultScreen;
 import com.bakbakan.screens.ScreenManager;
 import javafx.application.Application;
 import javafx.stage.Stage;
@@ -29,6 +30,12 @@ public class MainApp extends Application {
         screenManager.registerScreen("MainMenu", () -> new MainMenuScreen(bus));
         screenManager.registerScreen("HeroSelect", () -> new HeroSelectScreen(bus, session));
         screenManager.registerScreen("Fight", () -> new FightScreen(bus, session, assets));
+        screenManager.registerScreen("RoundWin",
+                () -> new ResultScreen(bus, session, ResultScreen.Mode.ROUND_WIN));
+        screenManager.registerScreen("GameOver",
+                () -> new ResultScreen(bus, session, ResultScreen.Mode.GAME_OVER));
+        screenManager.registerScreen("Victory",
+                () -> new ResultScreen(bus, session, ResultScreen.Mode.VICTORY));
 
         screenManager.showInitial("Loading");
         stage.show();

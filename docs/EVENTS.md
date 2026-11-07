@@ -19,13 +19,13 @@ Screens then request their own music with `SoundRequestEvent`.
 | SpecialReadyEvent | Fighter | Hud | Special bar reached 100; the HUD shows "SPECIAL READY". |
 | SpecialUsedEvent | Fighter | Hud | A special was activated; the HUD resets that fighter's special bar. |
 | SkillUsedEvent | Fighter | — | Signals a successful skill activation after mana was spent. Skill SFX is requested separately with `SoundRequestEvent`. |
-| RoundStartEvent | RoundManager | HUD, AudioManager, ScreenManager | A new round begins; carries round number and fighters. |
-| RoundEndEvent | RoundManager | ScreenManager, HUD, AudioManager | A round finished; carries round number, winner and reason. |
+| RoundStartEvent | RoundManager | HUD | A new round begins; the HUD resets health/mana/special and the timer, and shows the round number. |
+| RoundEndEvent | RoundManager | FightScreen | A round finished; the fight screen freezes combat and requests the matching result screen after a short delay. |
 | TimerTickEvent | RoundManager | HUD | Round timer updated; carries seconds remaining. |
-| TimeOutEvent | RoundManager | ScreenManager, HUD | Round timer expired; carries both health values and result. |
-| FighterDefeatedEvent | CombatSystem | RoundManager, HUD, AudioManager | A fighter's health reached zero after a hit. |
-| GameOverEvent | RoundManager | ScreenManager, AudioManager | Player lost; game over screen (Continue restarts Round 1). |
-| VictoryEvent | RoundManager | ScreenManager, AudioManager | Player beat Round 5; final victory screen. |
+| TimeOutEvent | RoundManager | HUD, FightScreen | Round timer expired; carries both health values and result. The HUD stops the clock and the fight screen shows "TIME OUT". |
+| FighterDefeatedEvent | CombatSystem | RoundManager | A fighter's health reached zero after a hit; the round manager resolves the KO. |
+| GameOverEvent | RoundManager | FightScreen | Player lost; the fight screen requests the Game Over screen (Continue restarts Round 1). |
+| VictoryEvent | RoundManager | FightScreen | Player beat Round 5; the fight screen requests the final Victory screen. |
 | PauseEvent | InputHandler / ScreenManager | FightScreen, HUD | Game paused; show pause overlay. |
 | ResumeEvent | InputHandler / ScreenManager | FightScreen, HUD | Game resumed; hide pause overlay. |
 | ScreenChangeEvent | Screens (request), ScreenManager (notification) | ScreenManager (requests), AudioManager (notifications) | Request or announce a screen transition. Requests are handled synchronously by `ScreenManager`. |
@@ -82,6 +82,39 @@ Screens then request their own music with `SoundRequestEvent`.
 | Luna | Rifle shot | Artillery barrage | Fast high bullet; three explosions |
 | Mabini | Quill throw | Decalogue light beam | High quill; high horizontal beam |
 | Lapulapu | Kampilan wave | Mactan tidal strike | Low wave; large low tidal wave |
+
+## Phase 5 rounds, AI and results
+
+1. `FightScreen.onShow()` reads `GameSession.getCurrentRound()`, builds an
+   `EnemyData` with `EnemyData.forRound(round, hero)`, creates both fighters and
+   attaches the HUD, `RoundManager` and `EnemyAI`.
+2. `RoundManager.startRound()` resets both fighters' health, mana and special,
+   places them at their start positions, and fires `RoundStartEvent`,
+   `TimerTickEvent(180)` and `round_start`.
+3. Every second `RoundManager` fires `TimerTickEvent`; at 0 it fires
+   `TimeOutEvent` and awards the win to the fighter with more health. A tie is a
+   player loss.
+4. `CombatSystem` fires `FighterDefeatedEvent` on a KO; `RoundManager` records
+   `RoundEndEvent`, then advances to the next round, fires `VictoryEvent` after
+   round 5, or fires `GameOverEvent` on a loss.
+5. `FightScreen` freezes combat for 1.35 seconds after `RoundEndEvent`, then
+   requests `RoundWin`, `GameOver` or `Victory` through `ScreenChangeEvent`.
+6. `EnemyAI` is a state machine (`APPROACH`, `RETREAT`, `ATTACK`, `BLOCK`,
+   `DUCK`, `WAIT`, `JUMP`). Reaction time, aggression, block/duck chance, skill
+   chance and special chance scale up each round. It uses the same
+   `SkillSystem` and `CombatSystem` as the player, so AI hits fire the same
+   `HitEvent`, `DamageEvent` and sound events.
+7. Rounds 1-4 use generic colonial soldiers with increasing damage. Round 5
+   uses `BossData` (150 health, 1.4x damage) and the HUD shows a `BOSS` tag and
+   the fight screen shows a BOSS banner.
+8. `ResultScreen` displays:
+   - RoundWin: "You Win!" / "Congratulations!" with Next Round and Main Menu.
+   - GameOver: "You Lose!" / "Better luck next time." with Continue (restarts
+     from Round 1) and Main Menu.
+   - Victory: "Victory!" / "Congrats! You finally defeated the boss!" with
+     Main Menu.
+9. `ResultScreen` requests `victory` music for RoundWin/Victory and `gameover`
+   music for GameOver.
 
 ## Audio ids
 

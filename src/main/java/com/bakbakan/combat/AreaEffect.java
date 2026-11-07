@@ -50,7 +50,7 @@ public final class AreaEffect {
         double end = Math.max(CombatConstants.MIN_X,
                 Math.min(CombatConstants.MAX_X, targetX));
         return new AreaEffect(Kind.FLAG_DASH, owner,
-                CombatConstants.SKILL_DAMAGE_FLAG_DASH, false,
+                owner.scaleDamage(CombatConstants.SKILL_DAMAGE_FLAG_DASH), false,
                 0, 0.28, end, end >= owner.getX() ? 1 : -1,
                 owner.getX(), end);
     }
@@ -59,13 +59,13 @@ public final class AreaEffect {
         double x = Math.max(CombatConstants.MIN_X + 80,
                 Math.min(CombatConstants.MAX_X - 80, targetX));
         return new AreaEffect(Kind.GIANT_BOOK, owner,
-                CombatConstants.SPECIAL_DAMAGE_GIANT_BOOK, false,
+                owner.scaleDamage(CombatConstants.SPECIAL_DAMAGE_GIANT_BOOK), false,
                 0.45, 0.35, x, 1, x, x);
     }
 
     public static AreaEffect shockwave(Fighter owner) {
         return new AreaEffect(Kind.SHOCKWAVE, owner,
-                CombatConstants.SPECIAL_DAMAGE_SHOCKWAVE, false,
+                owner.scaleDamage(CombatConstants.SPECIAL_DAMAGE_SHOCKWAVE), false,
                 0.05, 0.55, owner.getX(), 1, owner.getX(), owner.getX());
     }
 
@@ -73,13 +73,13 @@ public final class AreaEffect {
         double x = Math.max(CombatConstants.MIN_X,
                 Math.min(CombatConstants.MAX_X, targetX));
         return new AreaEffect(Kind.EXPLOSION, owner,
-                CombatConstants.SPECIAL_DAMAGE_ARTILLERY_HIT, false,
+                owner.scaleDamage(CombatConstants.SPECIAL_DAMAGE_ARTILLERY_HIT), false,
                 delay, 0.3, x, 1, x, x);
     }
 
     public static AreaEffect lightBeam(Fighter owner, boolean facingRight) {
         return new AreaEffect(Kind.LIGHT_BEAM, owner,
-                CombatConstants.SPECIAL_DAMAGE_BEAM, true,
+                owner.scaleDamage(CombatConstants.SPECIAL_DAMAGE_BEAM), true,
                 0.05, 0.45, owner.getX(), facingRight ? 1 : -1,
                 owner.getX(), owner.getX());
     }
