@@ -10,11 +10,17 @@ public class ScreenChangeEvent extends Event {
 
     private final String fromScreen;
     private final String toScreen;
+    private final boolean request;
 
     public ScreenChangeEvent(String fromScreen, String toScreen) {
+        this(fromScreen, toScreen, false);
+    }
+
+    public ScreenChangeEvent(String fromScreen, String toScreen, boolean request) {
         super(SCREEN_CHANGE);
         this.fromScreen = fromScreen;
         this.toScreen = toScreen;
+        this.request = request;
     }
 
     public String getFromScreen() {
@@ -23,5 +29,9 @@ public class ScreenChangeEvent extends Event {
 
     public String getToScreen() {
         return toScreen;
+    }
+
+    public boolean isRequest() {
+        return request;
     }
 }

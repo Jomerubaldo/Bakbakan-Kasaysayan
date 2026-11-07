@@ -3,6 +3,14 @@
 All custom events extend `javafx.event.Event` and are dispatched through the central
 `com.bakbakan.events.GameEventBus` using their own `EventType`.
 
+`ScreenChangeEvent` carries a `request` flag:
+
+- `request = true` — a screen asks `ScreenManager` to navigate.
+- `request = false` — `ScreenManager` notifies listeners that navigation completed.
+
+`AudioManager` ignores requests and stops/disposes music on completed screen changes.
+Screens then request their own music with `SoundRequestEvent`.
+
 | Event name | Fired by | Handled by | Purpose |
 |---|---|---|---|
 | HitEvent | CombatSystem | HUD, AudioManager, SpecialMeter | A fighter's attack connected; carries attacker/target, damage and whether it was blocked. |
@@ -20,5 +28,22 @@ All custom events extend `javafx.event.Event` and are dispatched through the cen
 | VictoryEvent | RoundManager | ScreenManager, AudioManager | Player beat Round 5; final victory screen. |
 | PauseEvent | InputHandler / ScreenManager | FightScreen, HUD | Game paused; show pause overlay. |
 | ResumeEvent | InputHandler / ScreenManager | FightScreen, HUD | Game resumed; hide pause overlay. |
-| ScreenChangeEvent | ScreenManager | AudioManager, HUD | Active screen changed; triggers music switch and cleanup. |
-| SoundRequestEvent | Any screen/system | AudioManager | Request a music track or SFX by id. |
+| ScreenChangeEvent | Screens (request), ScreenManager (notification) | ScreenManager (requests), AudioManager (notifications) | Request or announce a screen transition. Requests are handled synchronously by `ScreenManager`. |
+| SoundRequestEvent | LoadingScreen, MainMenuScreen, HeroSelectScreen, FightScreen, future combat systems | AudioManager | Request music or a sound effect by id. |
+
+## Phase 2 usage
+
+| Screen | Music requested | Navigation |
+|---|---|---|
+| LoadingScreen | `loading` (loop) | Fires `ScreenChangeEvent(..., "MainMenu", true)` after assets load. |
+| MainMenuScreen | `menu` (loop) | Play -> `HeroSelect`; Quit -> `Platform.exit()`. |
+| HeroSelectScreen | `menu` (loop) | Select -> stores `HeroData` in `GameSession`, then `Fight`; Back -> `MainMenu`. |
+| FightScreen (placeholder) | `battle` (loop) | Change Hero -> `HeroSelect`; Main Menu -> `MainMenu`. |
+
+## Audio ids
+
+- Music: `loading`, `menu`, `battle`, `victory`, `gameover`.
+- SFX: `ui_click`, `jump`, `hit`, `block`, `round_start`, `ko`,
+  plus `skill_<heroId>` and `special_<heroId>` for all five heroes.
+
+Missing files are replaced with generated WAV tones in the system temp folder.

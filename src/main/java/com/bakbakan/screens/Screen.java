@@ -1,6 +1,8 @@
 package com.bakbakan.screens;
 
 import javafx.scene.Parent;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 
 public interface Screen {
 
@@ -20,5 +22,17 @@ public interface Screen {
     }
 
     default void render() {
+    }
+
+    default void onKeyPressed(KeyEvent event) {
+    }
+
+    default void onKeyReleased(KeyEvent event) {
+    }
+
+    default void onMouseMoved(MouseEvent event) {
+    }
+
+    default void onMouseClicked(MouseEvent event) {
     }
 }
