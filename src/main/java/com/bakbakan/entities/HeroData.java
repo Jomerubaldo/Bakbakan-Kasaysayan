@@ -15,6 +15,14 @@ public record HeroData(
         String primaryColor,
         String accentColor) {
 
+    public static final HeroData DUMMY = new HeroData(
+            "dummy",
+            "Training Dummy",
+            "None",
+            "A stationary practice opponent.",
+            0, 0, 0, 0, 0,
+            "#5a6478", "#c0392b");
+
     public static final List<HeroData> ALL = List.of(
             new HeroData(
                     "rizal",

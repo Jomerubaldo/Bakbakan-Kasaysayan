@@ -1,10 +1,17 @@
 package com.bakbakan.screens;
 
+import com.bakbakan.assets.AssetManager;
+import com.bakbakan.assets.SpriteProvider;
+import com.bakbakan.combat.CombatConstants;
+import com.bakbakan.combat.CombatSystem;
+import com.bakbakan.combat.InputHandler;
+import com.bakbakan.entities.Fighter;
 import com.bakbakan.entities.GameSession;
 import com.bakbakan.entities.HeroData;
 import com.bakbakan.events.GameEventBus;
 import com.bakbakan.events.ScreenChangeEvent;
 import com.bakbakan.events.SoundRequestEvent;
+import com.bakbakan.ui.Hud;
 import com.bakbakan.util.GameConfig;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
@@ -22,24 +29,34 @@ import javafx.scene.text.TextAlignment;
 
 public class FightScreen implements Screen {
 
+    private static final String PLAYER_ID = "player";
+    private static final String OPPONENT_ID = "opponent";
     private static final double BUTTON_W = 170;
     private static final double BUTTON_H = 46;
     private static final double BACK_X = 40;
-    private static final double BACK_Y = 646;
-    private static final double MENU_X = 228;
+    private static final double BACK_Y = 650;
+    private static final double MENU_X = GameConfig.WIDTH - 40 - BUTTON_W;
 
     private final GameEventBus bus;
     private final GameSession session;
+    private final SpriteProvider sprites;
+    private final CombatSystem combat;
+    private final InputHandler input = new InputHandler();
     private final StackPane root;
     private final Canvas canvas;
 
+    private Fighter player;
+    private Fighter opponent;
+    private Hud hud;
     private double elapsed;
     private boolean backHovered;
     private boolean menuHovered;
 
-    public FightScreen(GameEventBus bus, GameSession session) {
+    public FightScreen(GameEventBus bus, GameSession session, AssetManager assets) {
         this.bus = bus;
         this.session = session;
+        this.sprites = new SpriteProvider(assets);
+        this.combat = new CombatSystem(bus);
         this.canvas = new Canvas(GameConfig.WIDTH, GameConfig.HEIGHT);
         this.root = new StackPane(canvas);
         this.root.setStyle("-fx-background-color: #0b1020;");
@@ -57,6 +74,21 @@ public class FightScreen implements Screen {
 
     @Override
     public void onShow() {
+        HeroData hero = session.hasSelectedHero()
+                ? session.getSelectedHero()
+                : HeroData.ALL.get(0);
+
+        player = new Fighter(PLAYER_ID, hero, 380, true);
+        opponent = new Fighter(OPPONENT_ID, HeroData.DUMMY, 900, false);
+
+        if (hud != null) {
+            hud.detach(bus);
+        }
+        hud = new Hud(PLAYER_ID, OPPONENT_ID, hero.name(), "Training Dummy");
+        hud.reset();
+        hud.attach(bus);
+
+        input.clear();
         elapsed = 0;
         backHovered = false;
         menuHovered = false;
@@ -65,59 +97,161 @@ public class FightScreen implements Screen {
     }
 
     @Override
+    public void onHide() {
+        if (hud != null) {
+            hud.detach(bus);
+        }
+        input.clear();
+    }
+
+    @Override
     public void update(double dt) {
+        if (player == null || opponent == null) {
+            return;
+        }
+
         elapsed += dt;
+
+        double direction = 0;
+        if (input.isDown(KeyCode.D) || input.isDown(KeyCode.RIGHT)) {
+            direction += 1;
+        }
+        if (input.isDown(KeyCode.A) || input.isDown(KeyCode.LEFT)) {
+            direction -= 1;
+        }
+
+        boolean duck = input.isDown(KeyCode.S) || input.isDown(KeyCode.DOWN);
+        boolean block = input.isDown(KeyCode.L);
+        player.setMoveInput(direction, duck, block);
+
+        if (input.consumePress(KeyCode.W) || input.consumePress(KeyCode.UP)) {
+            if (player.tryJump()) {
+                bus.fire(new SoundRequestEvent("jump", false));
+            }
+        }
+        if (input.consumePress(KeyCode.J)) {
+            player.tryAttack();
+        }
+
+        player.update(dt, opponent.getX());
+
+        opponent.setMoveInput(0, false, false);
+        opponent.update(dt, player.getX());
+
+        separateFighters();
+        combat.resolve(player, opponent);
+        combat.resolve(opponent, player);
+
+        input.endFrame();
+    }
+
+    private void separateFighters() {
+        double minDistance = CombatConstants.FIGHTER_WIDTH * 0.85;
+        double dx = opponent.getX() - player.getX();
+        if (Math.abs(dx) >= minDistance) {
+            return;
+        }
+        double direction = dx == 0 ? 1 : Math.signum(dx);
+        double push = (minDistance - Math.abs(dx)) / 2.0;
+        player.setPosition(clampX(player.getX() - direction * push), player.getY());
+        opponent.setPosition(clampX(opponent.getX() + direction * push), opponent.getY());
+    }
+
+    private double clampX(double x) {
+        return Math.max(CombatConstants.MIN_X, Math.min(CombatConstants.MAX_X, x));
     }
 
     @Override
     public void render() {
         GraphicsContext gc = canvas.getGraphicsContext2D();
 
-        HeroData hero = session.getSelectedHero();
-        Color accent = hero == null ? Color.web("#f4c542") : Color.web(hero.accentColor());
-        Color primary = hero == null ? Color.web("#2E5E8C") : Color.web(hero.primaryColor());
+        drawBackground(gc);
 
-        gc.setFill(new LinearGradient(0, 0, 0, 1, true, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.web("#0b1428")),
-                new Stop(1, Color.web("#1c0d12"))));
-        gc.fillRect(0, 0, GameConfig.WIDTH, GameConfig.HEIGHT);
-
-        gc.setFill(new Color(primary.getRed(), primary.getGreen(), primary.getBlue(), 0.18));
-        gc.fillOval(GameConfig.WIDTH / 2.0 - 280, 100, 560, 560);
-
-        gc.setTextAlign(TextAlignment.CENTER);
-
-        if (hero == null) {
-            gc.setFill(Color.web("#f4c542"));
-            gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 46));
-            gc.fillText("No hero selected", GameConfig.WIDTH / 2.0, 300);
-        } else {
-            gc.setFill(accent);
-            gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 56));
-            gc.fillText(hero.name(), GameConfig.WIDTH / 2.0, 280);
-
-            gc.setFill(Color.web("#e8e8f0"));
-            gc.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 22));
-            gc.fillText(hero.weapon(), GameConfig.WIDTH / 2.0, 320);
+        if (player != null && opponent != null) {
+            drawShadow(gc, opponent);
+            drawShadow(gc, player);
+            sprites.render(gc, opponent, elapsed);
+            sprites.render(gc, player, elapsed);
         }
 
-        double pulse = 0.65 + 0.35 * Math.sin(elapsed * 3.0);
-        gc.setFill(Color.web("#ffffff", pulse));
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 26));
-        gc.fillText("Fight screen placeholder", GameConfig.WIDTH / 2.0, 400);
+        if (hud != null) {
+            hud.render(gc);
+        }
 
-        gc.setFill(Color.web("#9aa4c0"));
-        gc.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 17));
-        gc.fillText("Combat, rounds and CPU opponents arrive in Phase 3.",
-                GameConfig.WIDTH / 2.0, 438);
+        drawFightBanner(gc);
 
-        gc.setFill(Color.web("#7f8aa8"));
-        gc.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 14));
-        gc.fillText("Controls preview:  A/D move   W jump   S duck   J attack   K skill   L block   E special",
-                GameConfig.WIDTH / 2.0, 500);
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.setFill(Color.web("#c7d0e8"));
+        gc.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 13));
+        gc.fillText("A/D Move    W Jump    S Duck    J Attack    L Block    (Esc/P pause in Phase 6)",
+                GameConfig.WIDTH / 2.0, 712);
 
         drawButton(gc, BACK_X, BACK_Y, "Change Hero", backHovered);
         drawButton(gc, MENU_X, BACK_Y, "Main Menu", menuHovered);
+    }
+
+    private void drawBackground(GraphicsContext gc) {
+        gc.setFill(new LinearGradient(0, 0, 0, 1, true, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#1b2a4a")),
+                new Stop(0.55, Color.web("#7a4a5a")),
+                new Stop(1, Color.web("#d98555"))));
+        gc.fillRect(0, 0, GameConfig.WIDTH, GameConfig.HEIGHT);
+
+        gc.setFill(Color.web("#f4c542", 0.18));
+        gc.fillOval(920, 80, 230, 230);
+        gc.setFill(Color.web("#f4c542"));
+        gc.fillOval(980, 140, 110, 110);
+
+        gc.setFill(Color.web("#ffffff", 0.16));
+        gc.fillOval(120, 120, 220, 60);
+        gc.fillOval(220, 100, 140, 50);
+        gc.fillOval(760, 230, 180, 50);
+
+        gc.setFill(Color.web("#22324a"));
+        gc.fillPolygon(
+                new double[]{0, 220, 430, 700, 950, GameConfig.WIDTH},
+                new double[]{560, 380, 560, 340, 560, 560}, 6);
+
+        gc.setFill(Color.web("#1a2740"));
+        gc.fillPolygon(
+                new double[]{0, 300, 560, 820, 1080, GameConfig.WIDTH},
+                new double[]{600, 470, 600, 430, 600, 600}, 6);
+
+        gc.setFill(Color.web("#3a2a1e"));
+        gc.fillRect(0, CombatConstants.GROUND_Y, GameConfig.WIDTH,
+                GameConfig.HEIGHT - CombatConstants.GROUND_Y);
+
+        gc.setFill(Color.web("#4c8f4a"));
+        gc.fillRect(0, CombatConstants.GROUND_Y - 8, GameConfig.WIDTH, 10);
+
+        gc.setStroke(Color.web("#5a3f2b", 0.5));
+        gc.setLineWidth(1);
+        for (double x = 80; x < GameConfig.WIDTH; x += 120) {
+            gc.strokeLine(x, CombatConstants.GROUND_Y + 10, x, GameConfig.HEIGHT);
+        }
+    }
+
+    private void drawShadow(GraphicsContext gc, Fighter fighter) {
+        double distance = Math.max(0, CombatConstants.GROUND_Y - fighter.getY());
+        double scale = Math.max(0.35, 1 - distance / 500.0);
+        gc.setFill(Color.web("#000000", 0.25));
+        gc.fillOval(fighter.getX() - 40 * scale,
+                CombatConstants.GROUND_Y - 6,
+                80 * scale,
+                16 * scale);
+    }
+
+    private void drawFightBanner(GraphicsContext gc) {
+        if (elapsed >= 1.2) {
+            return;
+        }
+        double alpha = elapsed < 0.8
+                ? Math.min(1, elapsed * 5)
+                : Math.max(0, 1 - (elapsed - 0.8) / 0.4);
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.setFill(Color.web("#f4c542", alpha));
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 72));
+        gc.fillText("FIGHT!", GameConfig.WIDTH / 2.0, 320);
     }
 
     private void drawButton(GraphicsContext gc, double x, double y,
@@ -136,9 +270,12 @@ public class FightScreen implements Screen {
 
     @Override
     public void onKeyPressed(KeyEvent event) {
-        if (event.getCode() == KeyCode.ESCAPE || event.getCode() == KeyCode.BACK_SPACE) {
-            backToHeroSelect();
-        }
+        input.keyPressed(event.getCode());
+    }
+
+    @Override
+    public void onKeyReleased(KeyEvent event) {
+        input.keyReleased(event.getCode());
     }
 
     @Override
@@ -150,7 +287,8 @@ public class FightScreen implements Screen {
     @Override
     public void onMouseClicked(MouseEvent event) {
         if (inside(event.getX(), event.getY(), BACK_X, BACK_Y)) {
-            backToHeroSelect();
+            bus.fire(new SoundRequestEvent("ui_click", false));
+            bus.fire(new ScreenChangeEvent(getName(), "HeroSelect", true));
         } else if (inside(event.getX(), event.getY(), MENU_X, BACK_Y)) {
             bus.fire(new SoundRequestEvent("ui_click", false));
             bus.fire(new ScreenChangeEvent(getName(), "MainMenu", true));
@@ -159,10 +297,5 @@ public class FightScreen implements Screen {
 
     private boolean inside(double x, double y, double rx, double ry) {
         return x >= rx && x <= rx + BUTTON_W && y >= ry && y <= ry + BUTTON_H;
-    }
-
-    private void backToHeroSelect() {
-        bus.fire(new SoundRequestEvent("ui_click", false));
-        bus.fire(new ScreenChangeEvent(getName(), "HeroSelect", true));
     }
 }
