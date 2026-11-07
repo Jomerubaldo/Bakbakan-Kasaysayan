@@ -1,0 +1,1 @@
+Before any task read docs/GAME_SPEC.md. Follow its architecture and rules. Never add a dependency without updating pom.xml and module-info.java. After every change run the compile command and report results.
