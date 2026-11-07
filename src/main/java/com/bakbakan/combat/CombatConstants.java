@@ -34,6 +34,27 @@ public final class CombatConstants {
     public static final double KNOCKBACK_SPEED = 220;
     public static final double BLOCKED_KNOCKBACK_SPEED = 80;
 
+    public static final double SKILL_MANA_COST = 30;
+    public static final double MANA_REGEN_BASE = 4;
+    public static final double MANA_REGEN_SCALING = 0.09;
+    public static final double SPECIAL_GAIN_DEALT = 1.15;
+    public static final double SPECIAL_GAIN_TAKEN = 0.9;
+    public static final double SKILL_CAST_LOCK = 0.35;
+    public static final double SPECIAL_CAST_LOCK = 0.55;
+    public static final double SKILL_COOLDOWN = 0.7;
+    public static final double SPECIAL_COOLDOWN = 1.0;
+
+    public static final double SKILL_DAMAGE_INK = 18;
+    public static final double SKILL_DAMAGE_FLAG_DASH = 20;
+    public static final double SKILL_DAMAGE_RIFLE = 24;
+    public static final double SKILL_DAMAGE_QUILL = 16;
+    public static final double SKILL_DAMAGE_KAMPILAN_WAVE = 22;
+    public static final double SPECIAL_DAMAGE_GIANT_BOOK = 36;
+    public static final double SPECIAL_DAMAGE_SHOCKWAVE = 28;
+    public static final double SPECIAL_DAMAGE_ARTILLERY_HIT = 10;
+    public static final double SPECIAL_DAMAGE_BEAM = 30;
+    public static final double SPECIAL_DAMAGE_TIDAL_WAVE = 34;
+
     private CombatConstants() {
     }
 }

@@ -30,9 +30,18 @@ public final class CombatSystem {
         }
 
         attacker.markHitLanded();
-
         boolean blocked = defender.isBlocking() && defender.isFacing(attacker);
-        double rawDamage = attacker.getAttackDamage();
+        applyHit(attacker, defender, attacker.getAttackDamage(), blocked);
+    }
+
+    public void applyHit(Fighter attacker, Fighter defender, double rawDamage, boolean blocked) {
+        if (attacker == null || defender == null) {
+            return;
+        }
+        if (!attacker.isAlive() || !defender.isAlive()) {
+            return;
+        }
+
         double damage = blocked
                 ? rawDamage * (1.0 - CombatConstants.BLOCK_DAMAGE_REDUCTION)
                 : rawDamage;
@@ -42,6 +51,9 @@ public final class CombatSystem {
         bus.fire(new HitEvent(attacker.getId(), defender.getId(), damage, blocked));
         bus.fire(new DamageEvent(defender.getId(), damage, defender.getHealth()));
         bus.fire(new SoundRequestEvent(blocked ? "block" : "hit", false));
+
+        attacker.addSpecial(damage * CombatConstants.SPECIAL_GAIN_DEALT);
+        defender.addSpecial(damage * CombatConstants.SPECIAL_GAIN_TAKEN);
 
         if (!defender.isAlive()) {
             bus.fire(new FighterDefeatedEvent(defender.getId(), attacker.getId()));

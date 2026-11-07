@@ -5,6 +5,7 @@ import com.bakbakan.assets.SpriteProvider;
 import com.bakbakan.combat.CombatConstants;
 import com.bakbakan.combat.CombatSystem;
 import com.bakbakan.combat.InputHandler;
+import com.bakbakan.combat.SkillSystem;
 import com.bakbakan.entities.Fighter;
 import com.bakbakan.entities.GameSession;
 import com.bakbakan.entities.HeroData;
@@ -41,6 +42,7 @@ public class FightScreen implements Screen {
     private final GameSession session;
     private final SpriteProvider sprites;
     private final CombatSystem combat;
+    private final SkillSystem skills;
     private final InputHandler input = new InputHandler();
     private final StackPane root;
     private final Canvas canvas;
@@ -51,12 +53,15 @@ public class FightScreen implements Screen {
     private double elapsed;
     private boolean backHovered;
     private boolean menuHovered;
+    private double noManaTimer;
+    private double notReadyTimer;
 
     public FightScreen(GameEventBus bus, GameSession session, AssetManager assets) {
         this.bus = bus;
         this.session = session;
         this.sprites = new SpriteProvider(assets);
         this.combat = new CombatSystem(bus);
+        this.skills = new SkillSystem(combat);
         this.canvas = new Canvas(GameConfig.WIDTH, GameConfig.HEIGHT);
         this.root = new StackPane(canvas);
         this.root.setStyle("-fx-background-color: #0b1020;");
@@ -78,8 +83,8 @@ public class FightScreen implements Screen {
                 ? session.getSelectedHero()
                 : HeroData.ALL.get(0);
 
-        player = new Fighter(PLAYER_ID, hero, 380, true);
-        opponent = new Fighter(OPPONENT_ID, HeroData.DUMMY, 900, false);
+        player = new Fighter(PLAYER_ID, hero, 380, true, bus);
+        opponent = new Fighter(OPPONENT_ID, HeroData.DUMMY, 900, false, bus);
 
         if (hud != null) {
             hud.detach(bus);
@@ -88,10 +93,13 @@ public class FightScreen implements Screen {
         hud.reset();
         hud.attach(bus);
 
+        skills.clear();
         input.clear();
         elapsed = 0;
         backHovered = false;
         menuHovered = false;
+        noManaTimer = 0;
+        notReadyTimer = 0;
         bus.fire(new SoundRequestEvent("battle", true));
         render();
     }
@@ -101,6 +109,7 @@ public class FightScreen implements Screen {
         if (hud != null) {
             hud.detach(bus);
         }
+        skills.clear();
         input.clear();
     }
 
@@ -130,7 +139,26 @@ public class FightScreen implements Screen {
             }
         }
         if (input.consumePress(KeyCode.J)) {
-            player.tryAttack();
+            if (player.tryAttack() && player.usesProjectileBasicAttack()) {
+                skills.castRizalBook(player, opponent);
+            }
+        }
+
+        if (input.consumePress(KeyCode.K)) {
+            if (player.getMana() + 1e-6 < CombatConstants.SKILL_MANA_COST) {
+                noManaTimer = 0.9;
+                bus.fire(new SoundRequestEvent("no_mana", false));
+            } else if (player.trySkill()) {
+                skills.castSkill(player, opponent);
+            }
+        }
+
+        if (input.consumePress(KeyCode.E)) {
+            if (player.trySpecial()) {
+                skills.castSpecial(player, opponent);
+            } else if (!player.isSpecialReady()) {
+                notReadyTimer = 0.9;
+            }
         }
 
         player.update(dt, opponent.getX());
@@ -141,6 +169,10 @@ public class FightScreen implements Screen {
         separateFighters();
         combat.resolve(player, opponent);
         combat.resolve(opponent, player);
+        skills.update(dt, player, opponent);
+
+        noManaTimer = Math.max(0, noManaTimer - dt);
+        notReadyTimer = Math.max(0, notReadyTimer - dt);
 
         input.endFrame();
     }
@@ -172,6 +204,7 @@ public class FightScreen implements Screen {
             drawShadow(gc, player);
             sprites.render(gc, opponent, elapsed);
             sprites.render(gc, player, elapsed);
+            skills.render(gc);
         }
 
         if (hud != null) {
@@ -179,11 +212,12 @@ public class FightScreen implements Screen {
         }
 
         drawFightBanner(gc);
+        drawCombatFeedback(gc);
 
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setFill(Color.web("#c7d0e8"));
         gc.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 13));
-        gc.fillText("A/D Move    W Jump    S Duck    J Attack    L Block    (Esc/P pause in Phase 6)",
+        gc.fillText("A/D Move   W Jump   S Duck   J Attack   K Skill   L Block   E Special   (Esc/P pause in Phase 6)",
                 GameConfig.WIDTH / 2.0, 712);
 
         drawButton(gc, BACK_X, BACK_Y, "Change Hero", backHovered);
@@ -252,6 +286,31 @@ public class FightScreen implements Screen {
         gc.setFill(Color.web("#f4c542", alpha));
         gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 72));
         gc.fillText("FIGHT!", GameConfig.WIDTH / 2.0, 320);
+    }
+
+    private void drawCombatFeedback(GraphicsContext gc) {
+        if (player == null) {
+            return;
+        }
+        if (noManaTimer > 0) {
+            drawFloatingText(gc, "NO MANA", player.getX(), player.getY() - 190,
+                    noManaTimer, Color.web("#ff6b6b"));
+        }
+        if (notReadyTimer > 0) {
+            drawFloatingText(gc, "SPECIAL NOT READY", player.getX(),
+                    player.getY() - 214, notReadyTimer, Color.web("#f4c542"));
+        }
+    }
+
+    private void drawFloatingText(GraphicsContext gc, String text, double x, double y,
+                                  double timer, Color color) {
+        double alpha = Math.min(1, timer / 0.25);
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 15));
+        gc.setFill(Color.web("#0a0f1e", alpha * 0.8));
+        gc.fillText(text, x + 2, y + 2);
+        gc.setFill(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha));
+        gc.fillText(text, x, y);
     }
 
     private void drawButton(GraphicsContext gc, double x, double y,

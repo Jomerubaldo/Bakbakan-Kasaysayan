@@ -1,14 +1,26 @@
 package com.bakbakan.entities;
 
 import com.bakbakan.combat.CombatConstants;
+import com.bakbakan.events.GameEventBus;
+import com.bakbakan.events.ManaChangedEvent;
+import com.bakbakan.events.SkillUsedEvent;
+import com.bakbakan.events.SoundRequestEvent;
+import com.bakbakan.events.SpecialReadyEvent;
+import com.bakbakan.events.SpecialUsedEvent;
 import javafx.geometry.Rectangle2D;
 
 public class Fighter extends Entity {
 
     private final HeroData hero;
     private final boolean playerControlled;
+    private final GameEventBus bus;
 
     private double health = CombatConstants.MAX_HEALTH;
+    private double mana = CombatConstants.MAX_MANA;
+    private double special;
+    private double manaAccumulator;
+    private boolean specialReadyAnnounced;
+
     private double velocityX;
     private double velocityY;
     private boolean onGround = true;
@@ -24,15 +36,17 @@ public class Fighter extends Entity {
     private double stateTime;
     private double attackCooldown;
     private double attackTime;
+    private double actionLock;
     private boolean hitLanded;
     private double hitStun;
     private double hitFlash;
     private double walkPhase;
 
-    public Fighter(String id, HeroData hero, double x, boolean playerControlled) {
+    public Fighter(String id, HeroData hero, double x, boolean playerControlled, GameEventBus bus) {
         super(id, x, CombatConstants.GROUND_Y);
         this.hero = hero;
         this.playerControlled = playerControlled;
+        this.bus = bus;
     }
 
     public void setMoveInput(double direction, boolean duck, boolean block) {
@@ -42,8 +56,9 @@ public class Fighter extends Entity {
     }
 
     public boolean tryJump() {
-        if (!onGround || ducking || blocking || hitStun > 0
-                || !isAlive() || state == FighterState.ATTACK) {
+        if (!onGround || ducking || blocking || hitStun > 0 || actionLock > 0
+                || !isAlive() || state == FighterState.ATTACK
+                || state == FighterState.SKILL || state == FighterState.SPECIAL) {
             return false;
         }
         velocityY = CombatConstants.JUMP_VELOCITY;
@@ -53,8 +68,9 @@ public class Fighter extends Entity {
     }
 
     public boolean tryAttack() {
-        if (!isAlive() || attackCooldown > 0 || hitStun > 0
-                || ducking || blocking || !onGround) {
+        if (!isAlive() || attackCooldown > 0 || hitStun > 0 || actionLock > 0
+                || ducking || blocking || !onGround
+                || state == FighterState.SKILL || state == FighterState.SPECIAL) {
             return false;
         }
         state = FighterState.ATTACK;
@@ -65,9 +81,54 @@ public class Fighter extends Entity {
         return true;
     }
 
+    public boolean trySkill() {
+        if (!canAct() || mana + 1e-6 < CombatConstants.SKILL_MANA_COST) {
+            return false;
+        }
+        mana = Math.max(0, mana - CombatConstants.SKILL_MANA_COST);
+        fireManaChanged();
+
+        state = FighterState.SKILL;
+        stateTime = 0;
+        actionLock = CombatConstants.SKILL_CAST_LOCK;
+        attackCooldown = CombatConstants.SKILL_COOLDOWN;
+        velocityX = 0;
+
+        bus.fire(new SkillUsedEvent(getId(), hero.id()));
+        bus.fire(new SoundRequestEvent("skill_" + hero.id(), false));
+        return true;
+    }
+
+    public boolean trySpecial() {
+        if (!canAct() || !isSpecialReady()) {
+            return false;
+        }
+        special = 0;
+        specialReadyAnnounced = false;
+
+        state = FighterState.SPECIAL;
+        stateTime = 0;
+        actionLock = CombatConstants.SPECIAL_CAST_LOCK;
+        attackCooldown = CombatConstants.SPECIAL_COOLDOWN;
+        velocityX = 0;
+
+        bus.fire(new SpecialUsedEvent(getId(), hero.id()));
+        bus.fire(new SoundRequestEvent("special_" + hero.id(), false));
+        return true;
+    }
+
+    private boolean canAct() {
+        return isAlive() && onGround && hitStun <= 0 && actionLock <= 0
+                && !ducking && !blocking
+                && state != FighterState.ATTACK
+                && state != FighterState.SKILL
+                && state != FighterState.SPECIAL;
+    }
+
     public void update(double dt, double opponentX) {
         stateTime += dt;
         attackCooldown = Math.max(0, attackCooldown - dt);
+        actionLock = Math.max(0, actionLock - dt);
         hitStun = Math.max(0, hitStun - dt);
         hitFlash = Math.max(0, hitFlash - dt);
 
@@ -80,6 +141,8 @@ public class Fighter extends Entity {
             return;
         }
 
+        updateMana(dt);
+
         facingRight = opponentX >= x;
 
         if (hitStun > 0) {
@@ -89,6 +152,19 @@ public class Fighter extends Entity {
             velocityX *= 0.9;
             applyPhysics(dt);
             return;
+        }
+
+        if (actionLock > 0) {
+            state = state == FighterState.SPECIAL
+                    ? FighterState.SPECIAL
+                    : FighterState.SKILL;
+            velocityX = 0;
+            applyPhysics(dt);
+            return;
+        }
+
+        if (state == FighterState.SKILL || state == FighterState.SPECIAL) {
+            state = onGround ? FighterState.IDLE : FighterState.JUMP;
         }
 
         if (state == FighterState.ATTACK && attackTime < CombatConstants.ATTACK_DURATION) {
@@ -129,6 +205,29 @@ public class Fighter extends Entity {
         } else {
             state = FighterState.IDLE;
         }
+    }
+
+    private void updateMana(double dt) {
+        if (hero.manaRegen() <= 0) {
+            return;
+        }
+        manaAccumulator += dt;
+        while (manaAccumulator >= 1.0) {
+            manaAccumulator -= 1.0;
+            if (mana < CombatConstants.MAX_MANA) {
+                double before = mana;
+                mana = Math.min(CombatConstants.MAX_MANA,
+                        mana + CombatConstants.MANA_REGEN_BASE
+                                + hero.manaRegen() * CombatConstants.MANA_REGEN_SCALING);
+                if (mana != before) {
+                    fireManaChanged();
+                }
+            }
+        }
+    }
+
+    private void fireManaChanged() {
+        bus.fire(new ManaChangedEvent(getId(), mana, CombatConstants.MAX_MANA));
     }
 
     private void applyPhysics(double dt) {
@@ -173,7 +272,24 @@ public class Fighter extends Entity {
         state = isAlive() ? FighterState.HIT : FighterState.KO;
     }
 
+    public void addSpecial(double amount) {
+        if (!isAlive() || amount <= 0) {
+            return;
+        }
+        double before = special;
+        special = Math.min(CombatConstants.MAX_SPECIAL, special + amount);
+        if (special >= CombatConstants.MAX_SPECIAL
+                && before < CombatConstants.MAX_SPECIAL
+                && !specialReadyAnnounced) {
+            specialReadyAnnounced = true;
+            bus.fire(new SpecialReadyEvent(getId()));
+        }
+    }
+
     public Rectangle2D getAttackHitbox() {
+        if (usesProjectileBasicAttack()) {
+            return null;
+        }
         if (state != FighterState.ATTACK || hitLanded) {
             return null;
         }
@@ -189,6 +305,10 @@ public class Fighter extends Entity {
                 ? x + CombatConstants.FIGHTER_WIDTH / 2.0
                 : x - CombatConstants.FIGHTER_WIDTH / 2.0 - reach;
         return new Rectangle2D(boxX, boxY, reach, boxHeight);
+    }
+
+    public boolean usesProjectileBasicAttack() {
+        return "rizal".equals(hero.id());
     }
 
     public Rectangle2D getHurtbox() {
@@ -225,6 +345,18 @@ public class Fighter extends Entity {
 
     public double getHealth() {
         return health;
+    }
+
+    public double getMana() {
+        return mana;
+    }
+
+    public double getSpecial() {
+        return special;
+    }
+
+    public boolean isSpecialReady() {
+        return special >= CombatConstants.MAX_SPECIAL - 1e-6;
     }
 
     public boolean isAlive() {
