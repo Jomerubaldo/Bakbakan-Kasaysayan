@@ -69,6 +69,14 @@ public class ScreenManager {
         this.stage.setScene(scene);
         this.stage.setResizable(false);
         this.stage.setOnCloseRequest(event -> Platform.exit());
+        this.stage.focusedProperty().addListener((observable, wasFocused, isFocused) -> {
+            if (!isFocused) {
+                pressedKeys.clear();
+                if (current != null) {
+                    current.onFocusLost();
+                }
+            }
+        });
 
         this.screenChangeHandler = this::handleScreenChangeRequest;
         this.bus.register(ScreenChangeEvent.SCREEN_CHANGE, screenChangeHandler);

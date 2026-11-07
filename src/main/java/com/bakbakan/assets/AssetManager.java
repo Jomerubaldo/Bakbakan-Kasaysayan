@@ -35,7 +35,7 @@ public final class AssetManager {
 
     private static String[] buildSfxIds() {
         List<String> ids = new ArrayList<>(List.of(
-                "ui_click", "jump", "hit", "block", "round_start", "ko"));
+                "ui_click", "jump", "hit", "block", "no_mana", "round_start", "ko"));
         for (HeroData hero : HeroData.ALL) {
             ids.add("skill_" + hero.id());
             ids.add("special_" + hero.id());

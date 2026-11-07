@@ -26,8 +26,8 @@ Screens then request their own music with `SoundRequestEvent`.
 | FighterDefeatedEvent | CombatSystem | RoundManager | A fighter's health reached zero after a hit; the round manager resolves the KO. |
 | GameOverEvent | RoundManager | FightScreen | Player lost; the fight screen requests the Game Over screen (Continue restarts Round 1). |
 | VictoryEvent | RoundManager | FightScreen | Player beat Round 5; the fight screen requests the final Victory screen. |
-| PauseEvent | InputHandler / ScreenManager | FightScreen, HUD | Game paused; show pause overlay. |
-| ResumeEvent | InputHandler / ScreenManager | FightScreen, HUD | Game resumed; hide pause overlay. |
+| PauseEvent | FightScreen | FightScreen, AudioManager | Game paused; show the pause overlay, freeze combat/timer/AI, and pause music. |
+| ResumeEvent | FightScreen | FightScreen, AudioManager | Game resumed; hide the pause overlay, continue from the frozen state, and resume music. |
 | ScreenChangeEvent | Screens (request), ScreenManager (notification) | ScreenManager (requests), AudioManager (notifications) | Request or announce a screen transition. Requests are handled synchronously by `ScreenManager`. |
 | SoundRequestEvent | Screens, Fighter, CombatSystem | AudioManager | Request music or a sound effect by id. |
 
@@ -43,7 +43,8 @@ Screens then request their own music with `SoundRequestEvent`.
 ## Phase 3 combat flow
 
 1. `FightScreen` forwards `KeyEvent`s to `InputHandler`, which tracks held keys and one-shot presses.
-2. A/D move, W jumps, S ducks (hold), J attacks, L blocks (hold). Esc/P are reserved for Phase 6.
+2. A/D move, W jumps, S ducks (hold), J attacks, L blocks (hold). Esc/P
+   toggle the pause overlay.
 3. `Fighter` applies gravity, ground collision, screen bounds, facing and attack cooldown.
 4. `CombatSystem` tests the attacker hitbox against the defender hurtbox.
 5. A blocked melee hit deals 30% damage (70% reduction) and uses shorter hit stun.
@@ -115,6 +116,30 @@ Screens then request their own music with `SoundRequestEvent`.
      Main Menu.
 9. `ResultScreen` requests `victory` music for RoundWin/Victory and `gameover`
    music for GameOver.
+
+## Phase 6 pause, resume and lifecycle
+
+1. `FightScreen` owns the pause state. Esc or P fires `PauseEvent`; pressing
+   Esc/P again, choosing Resume, or clicking the Resume button fires
+   `ResumeEvent`.
+2. `FightScreen.onPause()` clears input, zeroes both fighters' movement input,
+   and shows the pause overlay. `update()` returns immediately while paused, so
+   the round timer, enemy AI, projectiles, cooldowns, and result delay all freeze.
+3. `FightScreen.onResume()` clears stale input, hides the overlay, and lets the
+   next frame continue from the exact frozen state. No time is accumulated while
+   paused.
+4. The pause overlay uses real JavaFX `Button` nodes. Their `setOnAction`
+   handlers are the project's `ActionEvent` usage: Resume fires `ResumeEvent`;
+   Quit to Main Menu fires `ResumeEvent` (to unpause audio), then requests the
+   `MainMenu` screen.
+5. `AudioManager` handles `PauseEvent` by pausing the current `MediaPlayer` and
+   handles `ResumeEvent` by resuming it only if it was playing when paused.
+   Leaving a screen still stops and disposes the player.
+6. `ScreenManager` listens to the stage focus property. On focus loss it clears
+   the tracked key set and calls `Screen.onFocusLost()`; `FightScreen` clears its
+   input handler and fighter movement so keys cannot remain stuck.
+7. `Screen.onHide()` / `ScreenManager.stop()` detach event handlers and stop the
+   shared `AnimationTimer`. No per-screen timers or duplicate listeners remain.
 
 ## Audio ids
 

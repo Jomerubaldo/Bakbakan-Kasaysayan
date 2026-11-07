@@ -14,6 +14,8 @@ import com.bakbakan.entities.GameSession;
 import com.bakbakan.entities.HeroData;
 import com.bakbakan.events.GameEventBus;
 import com.bakbakan.events.GameOverEvent;
+import com.bakbakan.events.PauseEvent;
+import com.bakbakan.events.ResumeEvent;
 import com.bakbakan.events.RoundEndEvent;
 import com.bakbakan.events.ScreenChangeEvent;
 import com.bakbakan.events.SoundRequestEvent;
@@ -22,12 +24,17 @@ import com.bakbakan.events.VictoryEvent;
 import com.bakbakan.ui.Hud;
 import com.bakbakan.util.GameConfig;
 import javafx.event.EventHandler;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.LinearGradient;
@@ -45,6 +52,8 @@ public class FightScreen implements Screen {
     private static final double BACK_X = 40;
     private static final double BACK_Y = 650;
     private static final double MENU_X = GameConfig.WIDTH - 40 - BUTTON_W;
+    private static final double PAUSE_BUTTON_W = 300;
+    private static final double PAUSE_BUTTON_H = 54;
 
     private final GameEventBus bus;
     private final GameSession session;
@@ -54,11 +63,16 @@ public class FightScreen implements Screen {
     private final InputHandler input = new InputHandler();
     private final StackPane root;
     private final Canvas canvas;
+    private final StackPane pauseOverlay;
+    private final Button resumeButton;
+    private final Button quitButton;
 
     private final EventHandler<RoundEndEvent> roundEndHandler = this::onRoundEnd;
     private final EventHandler<GameOverEvent> gameOverHandler = this::onGameOver;
     private final EventHandler<VictoryEvent> victoryHandler = this::onVictory;
     private final EventHandler<TimeOutEvent> timeOutHandler = this::onTimeOut;
+    private final EventHandler<PauseEvent> pauseHandler = this::onPause;
+    private final EventHandler<ResumeEvent> resumeHandler = this::onResume;
 
     private Fighter player;
     private Fighter opponent;
@@ -75,6 +89,9 @@ public class FightScreen implements Screen {
     private double resultTimer;
     private String resultScreen;
     private boolean resultHandlersAttached;
+    private boolean pauseHandlersAttached;
+    private boolean paused;
+    private int pauseSelection;
 
     public FightScreen(GameEventBus bus, GameSession session, AssetManager assets) {
         this.bus = bus;
@@ -83,8 +100,69 @@ public class FightScreen implements Screen {
         this.combat = new CombatSystem(bus);
         this.skills = new SkillSystem(combat);
         this.canvas = new Canvas(GameConfig.WIDTH, GameConfig.HEIGHT);
-        this.root = new StackPane(canvas);
+        this.resumeButton = createPauseButton("Resume");
+        this.quitButton = createPauseButton("Quit to Main Menu");
+        this.pauseOverlay = buildPauseOverlay();
+        this.root = new StackPane(canvas, pauseOverlay);
         this.root.setStyle("-fx-background-color: #0b1020;");
+    }
+
+    private StackPane buildPauseOverlay() {
+        Label title = new Label("PAUSED");
+        title.setStyle("-fx-text-fill: #f4c542; -fx-font-family: 'Segoe UI';"
+                + " -fx-font-size: 58px; -fx-font-weight: bold;");
+
+        Label subtitle = new Label("The battle is frozen. Take a breath.");
+        subtitle.setStyle("-fx-text-fill: #c7d0e8; -fx-font-family: 'Segoe UI';"
+                + " -fx-font-size: 18px;");
+
+        Label hint = new Label("Esc/P to resume   |   Up/Down + Enter to choose");
+        hint.setStyle("-fx-text-fill: #8f9ab8; -fx-font-family: 'Segoe UI';"
+                + " -fx-font-size: 13px;");
+
+        resumeButton.setOnAction(event -> requestResume());
+        quitButton.setOnAction(event -> quitToMainMenu());
+        resumeButton.setOnMouseEntered(event -> {
+            pauseSelection = 0;
+            updatePauseSelection();
+        });
+        quitButton.setOnMouseEntered(event -> {
+            pauseSelection = 1;
+            updatePauseSelection();
+        });
+
+        VBox box = new VBox(18, title, subtitle, resumeButton, quitButton, hint);
+        box.setAlignment(Pos.CENTER);
+        box.setMaxWidth(460);
+        box.setPadding(new Insets(32));
+
+        StackPane overlay = new StackPane(box);
+        overlay.setStyle("-fx-background-color: rgba(5, 8, 20, 0.80);");
+        overlay.setVisible(false);
+        return overlay;
+    }
+
+    private Button createPauseButton(String text) {
+        Button button = new Button(text);
+        button.setFocusTraversable(false);
+        button.setPrefSize(PAUSE_BUTTON_W, PAUSE_BUTTON_H);
+        button.setStyle(pauseButtonStyle(false));
+        return button;
+    }
+
+    private void updatePauseSelection() {
+        resumeButton.setStyle(pauseButtonStyle(pauseSelection == 0));
+        quitButton.setStyle(pauseButtonStyle(pauseSelection == 1));
+    }
+
+    private String pauseButtonStyle(boolean selected) {
+        return "-fx-background-color: " + (selected ? "#f4c542" : "#1c2745") + ";"
+                + "-fx-text-fill: " + (selected ? "#0b1020" : "#e8e8f0") + ";"
+                + "-fx-font-family: 'Segoe UI'; -fx-font-size: 20px;"
+                + " -fx-font-weight: bold; -fx-background-radius: 14;"
+                + " -fx-border-radius: 14; -fx-border-width: 2;"
+                + " -fx-border-color: " + (selected ? "#ffe89a" : "#34405f") + ";"
+                + " -fx-cursor: hand;";
     }
 
     @Override
@@ -109,6 +187,10 @@ public class FightScreen implements Screen {
         opponent = new Fighter(OPPONENT_ID, enemyData.moveset(), 900, false, bus,
                 enemyData.maxHealth(), enemyData.damageMultiplier());
 
+        if (roundManager != null) {
+            roundManager.detach();
+            roundManager = null;
+        }
         if (hud != null) {
             hud.detach(bus);
         }
@@ -118,7 +200,12 @@ public class FightScreen implements Screen {
 
         skills.clear();
         input.clear();
+        paused = false;
+        pauseSelection = 0;
+        pauseOverlay.setVisible(false);
+        updatePauseSelection();
         attachResultHandlers();
+        attachPauseHandlers();
 
         roundManager = new RoundManager(bus, session);
         roundManager.attach();
@@ -139,6 +226,9 @@ public class FightScreen implements Screen {
 
     @Override
     public void onHide() {
+        paused = false;
+        pauseOverlay.setVisible(false);
+        detachPauseHandlers();
         detachResultHandlers();
         if (roundManager != null) {
             roundManager.detach();
@@ -155,6 +245,11 @@ public class FightScreen implements Screen {
     @Override
     public void update(double dt) {
         if (player == null || opponent == null) {
+            return;
+        }
+
+        if (paused) {
+            input.endFrame();
             return;
         }
 
@@ -265,6 +360,99 @@ public class FightScreen implements Screen {
         resultHandlersAttached = false;
     }
 
+    private void attachPauseHandlers() {
+        if (pauseHandlersAttached) {
+            return;
+        }
+        bus.register(PauseEvent.PAUSE, pauseHandler);
+        bus.register(ResumeEvent.RESUME, resumeHandler);
+        pauseHandlersAttached = true;
+    }
+
+    private void detachPauseHandlers() {
+        if (!pauseHandlersAttached) {
+            return;
+        }
+        bus.unregister(PauseEvent.PAUSE, pauseHandler);
+        bus.unregister(ResumeEvent.RESUME, resumeHandler);
+        pauseHandlersAttached = false;
+    }
+
+    private void onPause(PauseEvent event) {
+        if (paused) {
+            return;
+        }
+        paused = true;
+        pauseSelection = 0;
+        input.clear();
+        if (player != null) {
+            player.setMoveInput(0, false, false);
+        }
+        if (opponent != null) {
+            opponent.setMoveInput(0, false, false);
+        }
+        updatePauseSelection();
+        pauseOverlay.setVisible(true);
+        pauseOverlay.toFront();
+    }
+
+    private void onResume(ResumeEvent event) {
+        if (!paused) {
+            return;
+        }
+        paused = false;
+        input.clear();
+        if (player != null) {
+            player.setMoveInput(0, false, false);
+        }
+        if (opponent != null) {
+            opponent.setMoveInput(0, false, false);
+        }
+        pauseOverlay.setVisible(false);
+    }
+
+    private void requestPause() {
+        if (!paused) {
+            bus.fire(new PauseEvent());
+        }
+    }
+
+    private void requestResume() {
+        if (paused) {
+            bus.fire(new SoundRequestEvent("ui_click", false));
+            bus.fire(new ResumeEvent());
+        }
+    }
+
+    private void togglePause() {
+        if (paused) {
+            requestResume();
+        } else {
+            requestPause();
+        }
+    }
+
+    private void movePauseSelection(int delta) {
+        pauseSelection = Math.floorMod(pauseSelection + delta, 2);
+        updatePauseSelection();
+    }
+
+    private void activatePauseSelection() {
+        if (pauseSelection == 0) {
+            requestResume();
+        } else {
+            quitToMainMenu();
+        }
+    }
+
+    private void quitToMainMenu() {
+        bus.fire(new SoundRequestEvent("ui_click", false));
+        if (paused) {
+            bus.fire(new ResumeEvent());
+        }
+        bus.fire(new ScreenChangeEvent(getName(), "MainMenu", true));
+    }
+
     private void onRoundEnd(RoundEndEvent event) {
         if (resultScreen != null) {
             return;
@@ -338,7 +526,7 @@ public class FightScreen implements Screen {
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setFill(Color.web("#c7d0e8"));
         gc.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 13));
-        gc.fillText("A/D Move   W Jump   S Duck   J Attack   K Skill   L Block   E Special   (Esc/P pause in Phase 6)",
+        gc.fillText("A/D Move   W Jump   S Duck   J Attack   K Skill   L Block   E Special   Esc/P Pause",
                 GameConfig.WIDTH / 2.0, 712);
 
         drawButton(gc, BACK_X, BACK_Y, "Change Hero", backHovered);
@@ -493,28 +681,64 @@ public class FightScreen implements Screen {
 
     @Override
     public void onKeyPressed(KeyEvent event) {
-        input.keyPressed(event.getCode());
+        KeyCode code = event.getCode();
+        if (code == KeyCode.ESCAPE || code == KeyCode.P) {
+            togglePause();
+            event.consume();
+            return;
+        }
+        if (paused) {
+            if (code == KeyCode.UP || code == KeyCode.W) {
+                movePauseSelection(-1);
+            } else if (code == KeyCode.DOWN || code == KeyCode.S) {
+                movePauseSelection(1);
+            } else if (code == KeyCode.ENTER || code == KeyCode.SPACE) {
+                activatePauseSelection();
+            }
+            event.consume();
+            return;
+        }
+        input.keyPressed(code);
     }
 
     @Override
     public void onKeyReleased(KeyEvent event) {
-        input.keyReleased(event.getCode());
+        if (!paused) {
+            input.keyReleased(event.getCode());
+        }
     }
 
     @Override
     public void onMouseMoved(MouseEvent event) {
+        if (paused) {
+            return;
+        }
         backHovered = inside(event.getX(), event.getY(), BACK_X, BACK_Y);
         menuHovered = inside(event.getX(), event.getY(), MENU_X, BACK_Y);
     }
 
     @Override
     public void onMouseClicked(MouseEvent event) {
+        if (paused) {
+            return;
+        }
         if (inside(event.getX(), event.getY(), BACK_X, BACK_Y)) {
             bus.fire(new SoundRequestEvent("ui_click", false));
             bus.fire(new ScreenChangeEvent(getName(), "HeroSelect", true));
         } else if (inside(event.getX(), event.getY(), MENU_X, BACK_Y)) {
             bus.fire(new SoundRequestEvent("ui_click", false));
             bus.fire(new ScreenChangeEvent(getName(), "MainMenu", true));
+        }
+    }
+
+    @Override
+    public void onFocusLost() {
+        input.clear();
+        if (player != null) {
+            player.setMoveInput(0, false, false);
+        }
+        if (opponent != null) {
+            opponent.setMoveInput(0, false, false);
         }
     }
 

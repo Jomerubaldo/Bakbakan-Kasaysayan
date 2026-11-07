@@ -35,4 +35,7 @@ public interface Screen {
 
     default void onMouseClicked(MouseEvent event) {
     }
+
+    default void onFocusLost() {
+    }
 }

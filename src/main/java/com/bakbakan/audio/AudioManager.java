@@ -2,6 +2,8 @@ package com.bakbakan.audio;
 
 import com.bakbakan.assets.AssetManager;
 import com.bakbakan.events.GameEventBus;
+import com.bakbakan.events.PauseEvent;
+import com.bakbakan.events.ResumeEvent;
 import com.bakbakan.events.ScreenChangeEvent;
 import com.bakbakan.events.SoundRequestEvent;
 import javafx.event.EventHandler;
@@ -34,17 +36,25 @@ public final class AudioManager {
     private final Map<String, AudioClip> sfxCache = new HashMap<>();
     private final EventHandler<SoundRequestEvent> soundHandler;
     private final EventHandler<ScreenChangeEvent> screenHandler;
+    private final EventHandler<PauseEvent> pauseHandler;
+    private final EventHandler<ResumeEvent> resumeHandler;
 
     private MediaPlayer currentMusic;
     private String currentMusicId;
+    private boolean paused;
+    private boolean resumeMusicOnResume;
 
     public AudioManager(AssetManager assets, GameEventBus bus) {
         this.assets = assets;
         this.bus = bus;
         this.soundHandler = this::onSoundRequest;
         this.screenHandler = this::onScreenChange;
+        this.pauseHandler = this::onPause;
+        this.resumeHandler = this::onResume;
         this.bus.register(SoundRequestEvent.SOUND_REQUEST, soundHandler);
         this.bus.register(ScreenChangeEvent.SCREEN_CHANGE, screenHandler);
+        this.bus.register(PauseEvent.PAUSE, pauseHandler);
+        this.bus.register(ResumeEvent.RESUME, resumeHandler);
     }
 
     private void onSoundRequest(SoundRequestEvent event) {
@@ -59,7 +69,41 @@ public final class AudioManager {
         if (event.isRequest()) {
             return;
         }
+        paused = false;
+        resumeMusicOnResume = false;
         stopMusic();
+    }
+
+    private void onPause(PauseEvent event) {
+        if (paused) {
+            return;
+        }
+        paused = true;
+        resumeMusicOnResume = currentMusic != null
+                && currentMusic.getStatus() == MediaPlayer.Status.PLAYING;
+        if (resumeMusicOnResume) {
+            try {
+                currentMusic.pause();
+            } catch (RuntimeException ignored) {
+                resumeMusicOnResume = false;
+            }
+        }
+    }
+
+    private void onResume(ResumeEvent event) {
+        if (!paused) {
+            return;
+        }
+        paused = false;
+        if (resumeMusicOnResume && currentMusic != null
+                && currentMusic.getStatus() != MediaPlayer.Status.PLAYING) {
+            try {
+                currentMusic.play();
+            } catch (RuntimeException ignored) {
+                // Playback failure must not break the resumed game.
+            }
+        }
+        resumeMusicOnResume = false;
     }
 
     public void playMusic(String id) {
@@ -200,6 +244,7 @@ public final class AudioManager {
     }
 
     public void stopMusic() {
+        resumeMusicOnResume = false;
         if (currentMusic != null) {
             try {
                 currentMusic.stop();
@@ -218,6 +263,9 @@ public final class AudioManager {
         stopMusic();
         bus.unregister(SoundRequestEvent.SOUND_REQUEST, soundHandler);
         bus.unregister(ScreenChangeEvent.SCREEN_CHANGE, screenHandler);
+        bus.unregister(PauseEvent.PAUSE, pauseHandler);
+        bus.unregister(ResumeEvent.RESUME, resumeHandler);
         sfxCache.clear();
+        paused = false;
     }
 }
