@@ -14,8 +14,9 @@ A/D move, W jump, S duck (hold), J basic attack, K skill (costs mana), L block (
 - Health 100 for both fighters, reset every round. Mana max 100, regenerates automatically every second; skill (K) costs mana and is blocked if mana is insufficient.
 - Special bar 0-100: fills when dealing and receiving damage. At 100 show "SPECIAL READY"; pressing E uses the hero's special and resets the bar to 0.
 - Block reduces melee damage by 70%. Ducking avoids high projectiles.
-- Round timer 3:00. On timeout the fighter with higher health wins; a tie counts as a loss for the player.
-- Rounds 1-4: CPU opponent is a generic enemy soldier with increasing difficulty. Round 5: BOSS, the rival/antagonist of the chosen hero (see below), with higher health/damage.
+- Round timer 1:00. On timeout the fighter with higher health wins; a tie counts as a loss for the player.
+- Rounds 1-2: Spanish colonial soldiers (Scout, Guard). Rounds 3-4: American colonial soldiers (Rifleman, Sergeant). Difficulty rises each round. Round 5: final boss "El Verdugo" with higher health/damage. A warning/story cinematic plays before Round 5 and tells the true fate of the five heroes, highlighting the chosen hero. It has no timer and no skip; the player advances each slide with Enter only.
+- Losing to the final boss shows a short hero-specific legacy message on the Game Over screen (e.g., the hero's story lives on in the hearts of Filipinos and future generations).
 - Player loses any round -> Game Over -> Continue restarts from Round 1 (even if lost in round 2 or 3).
 - Player wins rounds 1-4 -> "You Win" screen -> next round. Wins round 5 -> Final Victory screen.
 
@@ -25,8 +26,8 @@ A/D move, W jump, S duck (hold), J basic attack, K skill (costs mana), L block (
 - Antonio Luna: strong, slower. J sword slash. K rifle shot. E artillery barrage (multi-hit).
 - Apolinario Mabini: tactical, fastest mana regen. J cane strike. K quill throw. E "Decalogue" scroll light beam.
 - Lapulapu: heavy defender. J kampilan slash. K kampilan wave. E "Mactan tidal strike" wave.
-BOSSES (put in one easy-to-edit BossData config; use fictional archetype characters, not real named people, except Magellan):
-- Rizal -> Spanish firing squad commander. Bonifacio -> Spanish colonial general. Luna -> colonial army commander. Mabini -> colonial governor. Lapulapu -> Ferdinand Magellan.
+FINAL BOSS (put in one easy-to-edit BossData config; use a fictional archetype, not a real named person):
+- "El Verdugo" — a fictional executioner/conqueror who embodies the forces behind the heroes' deaths. Per-hero descriptions reference the true historical circumstances: Rizal (firing squad at Bagumbayan), Bonifacio (Council of War execution), Luna (Presidential Guard at Cabanatuan), Mabini (American exile, died of cholera), Lapulapu (victory at Mactan; death unknown).
 
 6. ASSETS
 - No copyrighted material (no Street Fighter music or sprites).

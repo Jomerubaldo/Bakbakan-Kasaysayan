@@ -1,10 +1,12 @@
 package com.bakbakan.screens;
 
+import com.bakbakan.combat.CombatConstants;
 import com.bakbakan.entities.GameSession;
 import com.bakbakan.entities.HeroData;
 import com.bakbakan.events.GameEventBus;
 import com.bakbakan.events.ScreenChangeEvent;
 import com.bakbakan.events.SoundRequestEvent;
+import com.bakbakan.ui.BackdropArt;
 import com.bakbakan.util.GameConfig;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
@@ -89,7 +91,10 @@ public class ResultScreen implements Screen {
         };
 
         gc.setTextAlign(TextAlignment.CENTER);
-        gc.setFill(Color.web("#ffffff", 0.08 + 0.04 * Math.sin(elapsed * 2.0)));
+        double glowPulse = 0.08 + 0.04 * Math.sin(elapsed * 2.0);
+        gc.setFill(mode == Mode.GAME_OVER
+                ? Color.web("#ff3b3b", 0.03 + 0.015 * Math.sin(elapsed * 2.0))
+                : Color.web("#ffffff", glowPulse));
         gc.fillOval(GameConfig.WIDTH / 2.0 - 330, 58, 660, 660);
 
         gc.setFill(accent);
@@ -109,6 +114,10 @@ public class ResultScreen implements Screen {
             gc.setFill(Color.web("#8f9ab8"));
             gc.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 14));
             gc.fillText("Hero: " + hero.name(), GameConfig.WIDTH / 2.0, 418);
+            if (mode == Mode.GAME_OVER
+                    && session.getLastRoundNumber() >= CombatConstants.TOTAL_ROUNDS) {
+                drawLegacy(gc, hero);
+            }
         }
 
         if (mode == Mode.VICTORY) {
@@ -125,6 +134,11 @@ public class ResultScreen implements Screen {
     }
 
     private void drawBackground(GraphicsContext gc) {
+        if (mode == Mode.GAME_OVER) {
+            drawDefeatBackdrop(gc);
+            return;
+        }
+
         Color top = switch (mode) {
             case ROUND_WIN -> Color.web("#0d2230");
             case GAME_OVER -> Color.web("#220d16");
@@ -147,6 +161,126 @@ public class ResultScreen implements Screen {
         for (double y = 80; y < GameConfig.HEIGHT; y += 80) {
             gc.strokeLine(0, y, GameConfig.WIDTH, y);
         }
+    }
+
+    private void drawDefeatBackdrop(GraphicsContext gc) {
+        double width = GameConfig.WIDTH;
+        double height = GameConfig.HEIGHT;
+
+        gc.setFill(new LinearGradient(0, 0, 0, 1, true, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#160810")),
+                new Stop(0.45, Color.web("#2a0c16")),
+                new Stop(0.75, Color.web("#170a11")),
+                new Stop(1, Color.web("#070509"))));
+        gc.fillRect(0, 0, width, height);
+
+        double mx = 980;
+        double my = 250;
+        gc.save();
+        gc.translate(mx, my);
+        gc.rotate(elapsed * 2.5);
+        gc.translate(-mx, -my);
+        BackdropArt.sunRays(gc, mx, my, 300, Color.web("#ff3b3b", 0.05));
+        gc.restore();
+
+        gc.setFill(Color.web("#ff3b3b", 0.08));
+        gc.fillOval(mx - 130, my - 130, 260, 260);
+        gc.setFill(Color.web("#8f1f2a", 0.55));
+        gc.fillOval(mx - 78, my - 78, 156, 156);
+        gc.setFill(Color.web("#3a0b12", 0.96));
+        gc.fillOval(mx - 52, my - 58, 118, 122);
+        gc.setStroke(Color.web("#c0454c", 0.32));
+        gc.setLineWidth(3);
+        gc.strokeOval(mx - 76, my - 76, 152, 152);
+
+        BackdropArt.star(gc, 220, 110, 15, Color.web("#9a5560", 0.35));
+        BackdropArt.star(gc, 1080, 120, 13, Color.web("#9a5560", 0.30));
+        BackdropArt.star(gc, 700, 88, 9, Color.web("#9a5560", 0.25));
+
+        double drift = (elapsed * 8) % (width + 400);
+        BackdropArt.cloud(gc, 40 + drift, 205, 300, Color.web("#3a1620", 0.38));
+        BackdropArt.cloud(gc, 520 + drift * 0.6, 300, 240, Color.web("#2a1018", 0.38));
+
+        gc.setFill(Color.web("#1a0a14"));
+        gc.fillPolygon(
+                new double[]{0, 190, 380, 600, 820, 1040, width},
+                new double[]{560, 430, 545, 405, 545, 425, 560}, 7);
+        gc.setFill(Color.web("#120710"));
+        gc.fillPolygon(
+                new double[]{0, 260, 500, 760, 1010, width},
+                new double[]{600, 505, 595, 480, 590, 600}, 6);
+
+        gc.setFill(Color.web("#0a0609"));
+        gc.fillRect(0, 600, width, height - 600);
+
+        gc.setFill(Color.web("#12070d"));
+        gc.fillPolygon(
+                new double[]{0, 200, 420, 660, 900, 1120, width},
+                new double[]{640, 612, 632, 606, 636, 610, 638}, 7);
+
+        gc.setStroke(Color.web("#341018", 0.85));
+        gc.setLineWidth(2);
+        gc.strokeLine(560, 626, 610, 660);
+        gc.strokeLine(610, 660, 590, 694);
+        gc.strokeLine(610, 660, 652, 686);
+        gc.strokeLine(300, 650, 340, 678);
+        gc.strokeLine(340, 678, 322, 714);
+        gc.strokeLine(900, 644, 940, 672);
+        gc.strokeLine(940, 672, 922, 706);
+        gc.strokeLine(1020, 662, 1060, 690);
+
+        drawBrokenBanner(gc, 122, 642);
+        drawStuckBlade(gc, 470, 664, 92, -10);
+        drawStuckBlade(gc, 520, 668, 76, 8);
+        drawStuckBlade(gc, 1000, 664, 84, -7);
+        drawStuckBlade(gc, 1080, 668, 70, 12);
+
+        for (int i = 0; i < 36; i++) {
+            double ax = (i * 151 + elapsed * 9 * (i % 3 + 1)) % width;
+            double ay = (i * 83 + elapsed * (28 + (i % 5) * 9)) % height;
+            double alpha = 0.12 + 0.12 * Math.sin(elapsed * 2 + i);
+            Color dot = (i % 3 == 0)
+                    ? Color.web("#ff6b6b", Math.max(0.03, alpha))
+                    : Color.web("#8a8f99", Math.max(0.03, alpha));
+            gc.setFill(dot);
+            double size = 2 + (i % 2);
+            gc.fillOval(ax, ay, size, size);
+        }
+    }
+
+    private void drawBrokenBanner(GraphicsContext gc, double x, double groundY) {
+        gc.setStroke(Color.web("#241820"));
+        gc.setLineWidth(7);
+        gc.strokeLine(x, groundY, x - 26, groundY - 140);
+
+        gc.setFill(Color.web("#5a1a1f", 0.95));
+        gc.fillPolygon(
+                new double[]{x - 26, x + 46, x + 36, x + 22, x + 8, x - 8},
+                new double[]{groundY - 140, groundY - 134, groundY - 112,
+                        groundY - 124, groundY - 98, groundY - 116}, 6);
+        gc.setFill(Color.web("#3a0f14", 0.9));
+        gc.fillPolygon(
+                new double[]{x - 26, x + 18, x + 10, x - 6},
+                new double[]{groundY - 140, groundY - 126, groundY - 108,
+                        groundY - 124}, 4);
+    }
+
+    private void drawStuckBlade(GraphicsContext gc, double x, double groundY,
+                                double length, double tilt) {
+        gc.save();
+        gc.translate(x, groundY);
+        gc.rotate(tilt);
+
+        gc.setFill(Color.web("#3a3440"));
+        gc.fillRect(-3, -length, 6, length);
+        gc.setFill(Color.web("#2a2630"));
+        gc.fillPolygon(new double[]{-3, 3, 0}, new double[]{-12, -12, 0}, 3);
+
+        gc.setFill(Color.web("#1a161e"));
+        gc.fillRect(-11, -length, 22, 6);
+        gc.fillRect(-2, -length - 24, 4, 24);
+        gc.fillOval(-5, -length - 32, 10, 10);
+        gc.restore();
     }
 
     private String title() {
@@ -175,6 +309,32 @@ public class ResultScreen implements Screen {
             case GAME_OVER -> "Reached Round " + round + suffix
                     + ". Continue restarts from Round 1.";
             case VICTORY -> "Final round " + round + " cleared" + suffix + ".";
+        };
+    }
+
+    private void drawLegacy(GraphicsContext gc, HeroData hero) {
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.setFill(Color.web("#f4c542", 0.85));
+        gc.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 13));
+        gc.fillText("PAMANA NG BAYANI", GameConfig.WIDTH / 2.0, 454);
+
+        gc.setStroke(Color.web("#f4c542", 0.35));
+        gc.setLineWidth(1);
+        gc.strokeLine(GameConfig.WIDTH / 2.0 - 240, 464,
+                GameConfig.WIDTH / 2.0 + 240, 464);
+
+        gc.setFill(Color.web("#ffe89a"));
+        gc.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 18));
+        gc.fillText(legacyLine(hero), GameConfig.WIDTH / 2.0, 492);
+    }
+
+    private static String legacyLine(HeroData hero) {
+        return switch (hero.id()) {
+            case "rizal" -> "Namatay si Rizal, ngunit ang kanyang mga salita ay buhay sa bawat henerasyon.";
+            case "bonifacio" -> "Namatay si Bonifacio, ngunit ang sigaw ng Katipunan ay mananatili sa puso ng bayan.";
+            case "luna" -> "Namatay si Luna, ngunit ang kanyang tapang ay mananatili sa puso ng bawat Pilipino.";
+            case "mabini" -> "Namatay si Mabini, ngunit ang kanyang talino at diwa ay buhay sa bawat henerasyon.";
+            default -> "Namatay man si Lapulapu, ang alaala ng Mactan ay mananatili sa puso ng bayan.";
         };
     }
 

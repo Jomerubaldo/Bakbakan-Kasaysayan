@@ -46,7 +46,13 @@ public class EnemyAI {
         this.blockChance = 0.18 + difficulty * 0.32;
         this.duckChance = 0.12 + difficulty * 0.28;
         this.skillChance = 0.35 + difficulty * 0.4;
-        this.specialChance = 0.55 + difficulty * 0.4;
+        this.specialChance = isSoldier(self.getHero().id())
+                ? 0
+                : 0.55 + difficulty * 0.4;
+    }
+
+    private static boolean isSoldier(String id) {
+        return "spanish_soldier".equals(id) || "american_soldier".equals(id);
     }
 
     public void update(double dt) {
@@ -294,6 +300,9 @@ public class EnemyAI {
             case "lapulapu" -> 560;
             case "luna" -> 760;
             case "mabini" -> 700;
+            case "spanish_soldier" -> 600;
+            case "american_soldier" -> 660;
+            case "final_boss" -> 780;
             default -> 620;
         };
     }
@@ -302,6 +311,8 @@ public class EnemyAI {
         return switch (self.getHero().id()) {
             case "bonifacio" -> 270;
             case "lapulapu" -> 600;
+            case "spanish_soldier", "american_soldier" -> 0;
+            case "final_boss" -> 900;
             default -> 900;
         };
     }
@@ -313,6 +324,9 @@ public class EnemyAI {
             case "mabini" -> 210;
             case "bonifacio" -> 100;
             case "lapulapu" -> 120;
+            case "spanish_soldier" -> 260;
+            case "american_soldier" -> 290;
+            case "final_boss" -> 230;
             default -> 140;
         };
     }

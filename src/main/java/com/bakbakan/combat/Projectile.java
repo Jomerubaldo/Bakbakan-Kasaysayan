@@ -62,7 +62,7 @@ public final class Projectile {
     public static Projectile ink(Fighter owner, boolean facingRight) {
         return new Projectile(Kind.INK, owner,
                 owner.scaleDamage(CombatConstants.SKILL_DAMAGE_INK), false,
-                startX(owner, facingRight), owner.getY() - 70,
+                startX(owner, facingRight), owner.getY() - 95,
                 speed(480, facingRight), 0,
                 34, 34, 1.0, 5, facingRight);
     }
@@ -86,7 +86,7 @@ public final class Projectile {
     public static Projectile kampilanWave(Fighter owner, boolean facingRight) {
         return new Projectile(Kind.KAMPILAN_WAVE, owner,
                 owner.scaleDamage(CombatConstants.SKILL_DAMAGE_KAMPILAN_WAVE), false,
-                startX(owner, facingRight), owner.getY() - 50,
+                startX(owner, facingRight), owner.getY() - 80,
                 speed(430, facingRight), 0,
                 64, 54, 1.2, 0, facingRight);
     }
@@ -101,7 +101,7 @@ public final class Projectile {
 
     private static double startX(Fighter owner, boolean facingRight) {
         return owner.getX() + (facingRight ? 1 : -1)
-                * (CombatConstants.FIGHTER_WIDTH / 2.0 + 14);
+                * (CombatConstants.FIGHTER_WIDTH / 2.0 + 26);
     }
 
     private static double speed(double speed, boolean facingRight) {

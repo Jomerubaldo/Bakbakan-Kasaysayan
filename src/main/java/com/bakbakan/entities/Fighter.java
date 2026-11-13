@@ -438,6 +438,36 @@ public class Fighter extends Entity {
         return walkPhase;
     }
 
+    public double getVelocityX() {
+        return velocityX;
+    }
+
+    public double getVelocityY() {
+        return velocityY;
+    }
+
+    public double getAttackProgress() {
+        if (state != FighterState.ATTACK) {
+            return 0;
+        }
+        return Math.min(1, attackTime / CombatConstants.ATTACK_DURATION);
+    }
+
+    public double getCastProgress() {
+        if (actionLock <= 0) {
+            return 0;
+        }
+        if (state == FighterState.SKILL) {
+            return 1 - Math.min(1,
+                    actionLock / CombatConstants.SKILL_CAST_LOCK);
+        }
+        if (state == FighterState.SPECIAL) {
+            return 1 - Math.min(1,
+                    actionLock / CombatConstants.SPECIAL_CAST_LOCK);
+        }
+        return 0;
+    }
+
     public double getStateTime() {
         return stateTime;
     }

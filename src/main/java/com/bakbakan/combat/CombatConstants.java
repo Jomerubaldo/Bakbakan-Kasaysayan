@@ -6,7 +6,7 @@ public final class CombatConstants {
     public static final double MAX_MANA = 100;
     public static final double MAX_SPECIAL = 100;
     public static final double BLOCK_DAMAGE_REDUCTION = 0.7;
-    public static final int ROUND_TIME_SECONDS = 180;
+    public static final int ROUND_TIME_SECONDS = 60;
     public static final int TOTAL_ROUNDS = 5;
 
     public static final double GROUND_Y = 620;
@@ -54,6 +54,7 @@ public final class CombatConstants {
     public static final double SPECIAL_DAMAGE_ARTILLERY_HIT = 10;
     public static final double SPECIAL_DAMAGE_BEAM = 30;
     public static final double SPECIAL_DAMAGE_TIDAL_WAVE = 34;
+    public static final double SPECIAL_DAMAGE_FIRING_SQUAD = 32;
 
     private CombatConstants() {
     }

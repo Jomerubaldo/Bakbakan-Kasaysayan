@@ -12,45 +12,50 @@ public record BossData(
         String primaryColor,
         String accentColor) {
 
-    public static final double DEFAULT_BOSS_HEALTH = 150;
-    public static final double DEFAULT_BOSS_DAMAGE_MULTIPLIER = 1.4;
+    public static final String BOSS_ID = "final_boss";
+    public static final double DEFAULT_BOSS_HEALTH = 160;
+    public static final double DEFAULT_BOSS_DAMAGE_MULTIPLIER = 1.35;
+
+    private static final String BOSS_NAME = "El Verdugo";
+    private static final String BOSS_WEAPON = "Saber & Rifle";
+    private static final String BOSS_PRIMARY = "#2A1520";
 
     private static final List<BossData> ALL = List.of(
             new BossData(
                     "rizal",
-                    "Firing Squad Commander",
-                    "Rifle",
-                    "A stern colonial commander who leads the firing squad.",
+                    BOSS_NAME,
+                    BOSS_WEAPON,
+                    "The executioner who carried out the sentence at Bagumbayan.",
                     DEFAULT_BOSS_HEALTH, DEFAULT_BOSS_DAMAGE_MULTIPLIER,
-                    "#7B1E1E", "#D4AF37"),
+                    BOSS_PRIMARY, "#D4AF37"),
             new BossData(
                     "bonifacio",
-                    "Colonial General",
-                    "Saber",
-                    "A decorated colonial general who defends the old order.",
+                    BOSS_NAME,
+                    BOSS_WEAPON,
+                    "The executioner of the brotherhood, sent by the Council of War.",
                     DEFAULT_BOSS_HEALTH, DEFAULT_BOSS_DAMAGE_MULTIPLIER,
-                    "#5A1F2A", "#C9A227"),
+                    BOSS_PRIMARY, "#C0392B"),
             new BossData(
                     "luna",
-                    "Colonial Army Commander",
-                    "Saber & Pistol",
-                    "A disciplined army commander with a commander's pride.",
+                    BOSS_NAME,
+                    BOSS_WEAPON,
+                    "The assassin of Cabanatuan, hidden among the Presidential Guard.",
                     DEFAULT_BOSS_HEALTH, DEFAULT_BOSS_DAMAGE_MULTIPLIER,
-                    "#3E335C", "#C0392B"),
+                    BOSS_PRIMARY, "#E74C3C"),
             new BossData(
                     "mabini",
-                    "Colonial Governor",
-                    "Governor's Cane",
-                    "A calculating governor who rules through strategy and fear.",
+                    BOSS_NAME,
+                    BOSS_WEAPON,
+                    "The cold hand of exile that broke the Sublime Paralytic.",
                     DEFAULT_BOSS_HEALTH, DEFAULT_BOSS_DAMAGE_MULTIPLIER,
-                    "#243447", "#D4AF37"),
+                    BOSS_PRIMARY, "#D4AF37"),
             new BossData(
                     "lapulapu",
-                    "Ferdinand Magellan",
-                    "Sword",
-                    "The armored expedition commander who challenges Mactan.",
+                    BOSS_NAME,
+                    BOSS_WEAPON,
+                    "The last conquistador, demanding vengeance for Mactan.",
                     DEFAULT_BOSS_HEALTH, DEFAULT_BOSS_DAMAGE_MULTIPLIER,
-                    "#6E2C24", "#C0C0C0")
+                    BOSS_PRIMARY, "#C0C0C0")
     );
 
     public static BossData forHero(HeroData hero) {
@@ -66,15 +71,11 @@ public record BossData(
 
     public HeroData toHeroData(HeroData playerHero) {
         return new HeroData(
-                playerHero.id(),
+                BOSS_ID,
                 name,
                 weapon,
                 description,
-                playerHero.speed(),
-                playerHero.damage(),
-                playerHero.range(),
-                playerHero.defense(),
-                playerHero.manaRegen(),
+                55, 95, 70, 70, 60,
                 primaryColor,
                 accentColor);
     }

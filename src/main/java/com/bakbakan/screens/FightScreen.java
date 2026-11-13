@@ -21,7 +21,11 @@ import com.bakbakan.events.ScreenChangeEvent;
 import com.bakbakan.events.SoundRequestEvent;
 import com.bakbakan.events.TimeOutEvent;
 import com.bakbakan.events.VictoryEvent;
+import com.bakbakan.ui.BackdropArt;
+import com.bakbakan.ui.FinalWarningCinematic;
 import com.bakbakan.ui.Hud;
+import com.bakbakan.ui.ImpactCamera;
+import com.bakbakan.ui.SpecialCinematic;
 import com.bakbakan.util.GameConfig;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -61,6 +65,9 @@ public class FightScreen implements Screen {
     private final CombatSystem combat;
     private final SkillSystem skills;
     private final InputHandler input = new InputHandler();
+    private final SpecialCinematic cinematic = new SpecialCinematic();
+    private final FinalWarningCinematic finalWarning = new FinalWarningCinematic();
+    private final ImpactCamera impactCamera = new ImpactCamera();
     private final StackPane root;
     private final Canvas canvas;
     private final StackPane pauseOverlay;
@@ -202,6 +209,9 @@ public class FightScreen implements Screen {
         input.clear();
         paused = false;
         pauseSelection = 0;
+        cinematic.stop();
+        finalWarning.stop();
+        impactCamera.stop();
         pauseOverlay.setVisible(false);
         updatePauseSelection();
         attachResultHandlers();
@@ -211,6 +221,9 @@ public class FightScreen implements Screen {
         roundManager.attach();
         enemyAI = new EnemyAI(opponent, player, skills, round);
         roundManager.startRound(player, opponent, enemyData);
+        if (round >= CombatConstants.TOTAL_ROUNDS) {
+            finalWarning.start(hero, enemyData.moveset());
+        }
 
         elapsed = 0;
         backHovered = false;
@@ -239,6 +252,9 @@ public class FightScreen implements Screen {
         }
         skills.clear();
         input.clear();
+        cinematic.stop();
+        finalWarning.stop();
+        impactCamera.stop();
         enemyAI = null;
     }
 
@@ -253,7 +269,22 @@ public class FightScreen implements Screen {
             return;
         }
 
-        elapsed += dt;
+        cinematic.update(dt);
+        if (cinematic.isActive()) {
+            input.endFrame();
+            return;
+        }
+
+        finalWarning.update(dt);
+        if (finalWarning.isActive()) {
+            input.endFrame();
+            return;
+        }
+
+        impactCamera.update(dt);
+        double worldDt = dt * impactCamera.timeScale();
+
+        elapsed += worldDt;
         noManaTimer = Math.max(0, noManaTimer - dt);
         notReadyTimer = Math.max(0, notReadyTimer - dt);
         timeOutTimer = Math.max(0, timeOutTimer - dt);
@@ -309,17 +340,18 @@ public class FightScreen implements Screen {
         if (input.consumePress(KeyCode.E)) {
             if (player.trySpecial()) {
                 skills.castSpecial(player, opponent);
+                cinematic.start(player.getHero());
             } else if (!player.isSpecialReady()) {
                 notReadyTimer = 0.9;
             }
         }
 
         if (enemyAI != null) {
-            enemyAI.update(dt);
+            enemyAI.update(worldDt);
         }
 
-        player.update(dt, opponent.getX());
-        opponent.update(dt, player.getX());
+        player.update(worldDt, opponent.getX());
+        opponent.update(worldDt, player.getX());
 
         separateFighters();
         if (resultScreen == null) {
@@ -329,10 +361,17 @@ public class FightScreen implements Screen {
             combat.resolve(opponent, player);
         }
         if (resultScreen == null) {
-            skills.update(dt, player, opponent);
+            skills.update(worldDt, player, opponent);
+        }
+        for (SkillSystem.Impact impact : skills.drainImpacts()) {
+            Fighter caster = impact.attacker();
+            Fighter target = caster == player ? opponent : player;
+            double focusX = (caster.getX() + target.getX()) / 2.0;
+            impactCamera.trigger(focusX, 470, impact.special(),
+                    Color.web(caster.getHero().accentColor()));
         }
         if (roundManager != null) {
-            roundManager.update(dt);
+            roundManager.update(worldDt);
         }
 
         input.endFrame();
@@ -506,6 +545,8 @@ public class FightScreen implements Screen {
     public void render() {
         GraphicsContext gc = canvas.getGraphicsContext2D();
 
+        gc.save();
+        impactCamera.applyWorldTransform(gc);
         drawBackground(gc);
 
         if (player != null && opponent != null) {
@@ -514,6 +555,11 @@ public class FightScreen implements Screen {
             sprites.render(gc, opponent, elapsed);
             sprites.render(gc, player, elapsed);
             skills.render(gc);
+        }
+        gc.restore();
+
+        if (impactCamera.isActive()) {
+            impactCamera.renderOverlay(gc);
         }
 
         if (hud != null) {
@@ -531,47 +577,187 @@ public class FightScreen implements Screen {
 
         drawButton(gc, BACK_X, BACK_Y, "Change Hero", backHovered);
         drawButton(gc, MENU_X, BACK_Y, "Main Menu", menuHovered);
+
+        if (cinematic.isActive()) {
+            cinematic.render(gc, sprites);
+        }
+        if (finalWarning.isActive()) {
+            finalWarning.render(gc, sprites);
+        }
     }
 
     private void drawBackground(GraphicsContext gc) {
+        double horizon = CombatConstants.GROUND_Y;
+
         gc.setFill(new LinearGradient(0, 0, 0, 1, true, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.web("#1b2a4a")),
-                new Stop(0.55, Color.web("#7a4a5a")),
-                new Stop(1, Color.web("#d98555"))));
-        gc.fillRect(0, 0, GameConfig.WIDTH, GameConfig.HEIGHT);
+                new Stop(0, Color.web("#0a1730")),
+                new Stop(0.35, Color.web("#3a2148")),
+                new Stop(0.62, Color.web("#a8473a")),
+                new Stop(0.85, Color.web("#e8864a")),
+                new Stop(1, Color.web("#f2b36a"))));
+        gc.fillRect(0, 0, GameConfig.WIDTH, horizon);
 
-        gc.setFill(Color.web("#f4c542", 0.18));
-        gc.fillOval(920, 80, 230, 230);
-        gc.setFill(Color.web("#f4c542"));
-        gc.fillOval(980, 140, 110, 110);
+        double sunX = 1010;
+        double sunY = 455;
+        gc.save();
+        gc.translate(sunX, sunY);
+        gc.rotate(elapsed * 5);
+        gc.translate(-sunX, -sunY);
+        BackdropArt.sunRays(gc, sunX, sunY, 300, Color.web("#ffd97a", 0.10));
+        gc.restore();
 
-        gc.setFill(Color.web("#ffffff", 0.16));
-        gc.fillOval(120, 120, 220, 60);
-        gc.fillOval(220, 100, 140, 50);
-        gc.fillOval(760, 230, 180, 50);
+        gc.setFill(Color.web("#ffd97a", 0.14));
+        gc.fillOval(sunX - 140, sunY - 140, 280, 280);
+        gc.setFill(Color.web("#ffcf6a", 0.50));
+        gc.fillOval(sunX - 72, sunY - 72, 144, 144);
+        gc.setFill(Color.web("#ffe6a0", 0.85));
+        gc.fillOval(sunX - 50, sunY - 50, 100, 100);
 
-        gc.setFill(Color.web("#22324a"));
+        BackdropArt.star(gc, 210, 118, 18, Color.web("#f4c542", 0.45));
+        BackdropArt.star(gc, 1090, 98, 14, Color.web("#f4c542", 0.40));
+        BackdropArt.star(gc, 760, 148, 10, Color.web("#f4c542", 0.30));
+
+        double drift = (elapsed * 16) % (GameConfig.WIDTH + 360);
+        BackdropArt.cloud(gc, 40 + drift, 200, 280, Color.web("#ffffff", 0.10));
+        BackdropArt.cloud(gc, 560 + drift * 0.6, 290, 220, Color.web("#ffffff", 0.07));
+
+        gc.setFill(Color.web("#3a2a4a"));
         gc.fillPolygon(
-                new double[]{0, 220, 430, 700, 950, GameConfig.WIDTH},
-                new double[]{560, 380, 560, 340, 560, 560}, 6);
+                new double[]{0, 160, 330, 520, 700, 900, 1100, 1280},
+                new double[]{horizon - 40, horizon - 170, horizon - 60,
+                        horizon - 190, horizon - 70, horizon - 160,
+                        horizon - 50, horizon - 120}, 8);
 
-        gc.setFill(Color.web("#1a2740"));
+        gc.setFill(Color.web("#2a2038"));
         gc.fillPolygon(
-                new double[]{0, 300, 560, 820, 1080, GameConfig.WIDTH},
-                new double[]{600, 470, 600, 430, 600, 600}, 6);
+                new double[]{180, 330, 380, 430, 520},
+                new double[]{horizon - 40, horizon - 250, horizon - 236,
+                        horizon - 250, horizon - 40}, 5);
+        gc.setFill(Color.web("#d98555", 0.35));
+        gc.fillPolygon(
+                new double[]{352, 366, 380, 394, 408},
+                new double[]{horizon - 238, horizon - 215, horizon - 208,
+                        horizon - 215, horizon - 238}, 5);
+
+        gc.setFill(Color.web("#23402e"));
+        gc.fillPolygon(
+                new double[]{0, 200, 420, 660, 900, 1120, 1280},
+                new double[]{horizon, horizon - 70, horizon - 30, horizon - 80,
+                        horizon - 25, horizon - 65, horizon}, 7);
+        gc.setStroke(Color.web("#3f6b45", 0.45));
+        gc.setLineWidth(2);
+        for (int i = 1; i <= 3; i++) {
+            double y = horizon - i * 16;
+            gc.strokeLine(0, y, GameConfig.WIDTH, y - 6);
+        }
+
+        drawNipaHut(gc, 70, horizon - 6, 1.0);
+        drawNipaHut(gc, 1120, horizon - 6, 0.9);
+        drawPalm(gc, 165, horizon - 8, 1.0);
+        drawPalm(gc, 1055, horizon - 8, 0.85);
+        drawFlag(gc, 40, horizon - 6, 150);
+
+        drawTorch(gc, 250, horizon);
+        drawTorch(gc, 1030, horizon);
+
+        for (int i = 0; i < 20; i++) {
+            double fx = (i * 149 + elapsed * 14 * (i % 3 + 1)) % GameConfig.WIDTH;
+            double fy = 300 + Math.sin(elapsed * 1.3 + i) * 110 + (i % 5) * 24;
+            double alpha = 0.16 + 0.12 * Math.sin(elapsed * 2 + i);
+            gc.setFill(Color.web("#ffe6a0", Math.max(0.03, alpha)));
+            gc.fillOval(fx, fy, 3, 3);
+        }
 
         gc.setFill(Color.web("#3a2a1e"));
-        gc.fillRect(0, CombatConstants.GROUND_Y, GameConfig.WIDTH,
-                GameConfig.HEIGHT - CombatConstants.GROUND_Y);
+        gc.fillRect(0, horizon, GameConfig.WIDTH, GameConfig.HEIGHT - horizon);
 
         gc.setFill(Color.web("#4c8f4a"));
-        gc.fillRect(0, CombatConstants.GROUND_Y - 8, GameConfig.WIDTH, 10);
+        gc.fillRect(0, horizon - 8, GameConfig.WIDTH, 10);
 
         gc.setStroke(Color.web("#5a3f2b", 0.5));
         gc.setLineWidth(1);
         for (double x = 80; x < GameConfig.WIDTH; x += 120) {
-            gc.strokeLine(x, CombatConstants.GROUND_Y + 10, x, GameConfig.HEIGHT);
+            gc.strokeLine(x, horizon + 10, x, GameConfig.HEIGHT);
         }
+        gc.setStroke(Color.web("#2a1c12", 0.45));
+        for (double x = 40; x < GameConfig.WIDTH; x += 80) {
+            gc.strokeLine(x, horizon + 4, x + 40, horizon + 18);
+        }
+    }
+
+    private void drawNipaHut(GraphicsContext gc, double x, double baseY, double scale) {
+        gc.save();
+        gc.translate(x, baseY);
+        gc.scale(scale, scale);
+
+        gc.setFill(Color.web("#4a2f1c"));
+        gc.fillRect(-26, -40, 52, 40);
+        gc.setFill(Color.web("#1a1008"));
+        gc.fillRect(-8, -26, 16, 26);
+
+        gc.setFill(Color.web("#6b4a2a"));
+        gc.fillPolygon(new double[]{-38, 0, 38}, new double[]{-40, -78, -40}, 3);
+        gc.setFill(Color.web("#7d5a33"));
+        gc.fillPolygon(new double[]{-32, 0, 32}, new double[]{-44, -72, -44}, 3);
+
+        gc.setFill(Color.web("#2a1a10"));
+        gc.fillRect(-30, -8, 5, 8);
+        gc.fillRect(25, -8, 5, 8);
+        gc.restore();
+    }
+
+    private void drawPalm(GraphicsContext gc, double x, double baseY, double scale) {
+        gc.save();
+        gc.translate(x, baseY);
+        gc.scale(scale, scale);
+
+        gc.setStroke(Color.web("#1a2a1a"));
+        gc.setLineWidth(6);
+        gc.strokeLine(0, 0, 6, -82);
+
+        gc.setStroke(Color.web("#22401f"));
+        gc.setLineWidth(5);
+        for (int i = 0; i < 7; i++) {
+            double angle = -Math.PI / 2 + (i - 3) * 0.42;
+            gc.strokeLine(6, -82, 6 + Math.cos(angle) * 34, -82 + Math.sin(angle) * 34);
+        }
+        gc.restore();
+    }
+
+    private void drawFlag(GraphicsContext gc, double x, double baseY, double height) {
+        gc.setStroke(Color.web("#5a4a3a"));
+        gc.setLineWidth(4);
+        gc.strokeLine(x, baseY, x, baseY - height);
+
+        double top = baseY - height;
+        double w = 64;
+        double h = 40;
+        double wave = Math.sin(elapsed * 2.2) * 4;
+
+        gc.setFill(Color.web("#0b3d8c"));
+        gc.fillPolygon(new double[]{x, x + w, x + w + wave, x},
+                new double[]{top, top - 2, top + h / 2.0 - 2, top + h / 2.0}, 4);
+        gc.setFill(Color.web("#c0392b"));
+        gc.fillPolygon(new double[]{x, x + w + wave, x + w, x},
+                new double[]{top + h / 2.0, top + h / 2.0 - 2, top + h - 2, top + h}, 4);
+        gc.setFill(Color.web("#f4f0e4"));
+        gc.fillPolygon(new double[]{x, x + 26, x},
+                new double[]{top, top + h / 2.0, top + h}, 3);
+        gc.setFill(Color.web("#f4c542"));
+        gc.fillOval(x + 7, top + h / 2.0 - 4, 8, 8);
+    }
+
+    private void drawTorch(GraphicsContext gc, double x, double groundY) {
+        gc.setFill(Color.web("#3a2414"));
+        gc.fillRect(x - 4, groundY - 120, 8, 120);
+        gc.setFill(Color.web("#241408"));
+        gc.fillRect(x - 12, groundY - 8, 24, 8);
+
+        double flicker = 1 + 0.15 * Math.sin(elapsed * 12 + x);
+        gc.setFill(Color.web("#ff8c32", 0.90));
+        gc.fillOval(x - 10, groundY - 144 - 10 * flicker, 20, 30 * flicker);
+        gc.setFill(Color.web("#ffd97a", 0.90));
+        gc.fillOval(x - 6, groundY - 140 - 8 * flicker, 12, 20 * flicker);
     }
 
     private void drawShadow(GraphicsContext gc, Fighter fighter) {
@@ -682,6 +868,20 @@ public class FightScreen implements Screen {
     @Override
     public void onKeyPressed(KeyEvent event) {
         KeyCode code = event.getCode();
+        if (finalWarning.isActive()) {
+            if (code == KeyCode.ENTER) {
+                finalWarning.advance();
+            }
+            event.consume();
+            return;
+        }
+        if (cinematic.isActive()) {
+            if (code == KeyCode.ESCAPE || code == KeyCode.ENTER || code == KeyCode.SPACE) {
+                cinematic.skip();
+            }
+            event.consume();
+            return;
+        }
         if (code == KeyCode.ESCAPE || code == KeyCode.P) {
             togglePause();
             event.consume();
@@ -703,14 +903,14 @@ public class FightScreen implements Screen {
 
     @Override
     public void onKeyReleased(KeyEvent event) {
-        if (!paused) {
+        if (!paused && !cinematic.isActive() && !finalWarning.isActive()) {
             input.keyReleased(event.getCode());
         }
     }
 
     @Override
     public void onMouseMoved(MouseEvent event) {
-        if (paused) {
+        if (paused || cinematic.isActive() || finalWarning.isActive()) {
             return;
         }
         backHovered = inside(event.getX(), event.getY(), BACK_X, BACK_Y);
@@ -719,7 +919,7 @@ public class FightScreen implements Screen {
 
     @Override
     public void onMouseClicked(MouseEvent event) {
-        if (paused) {
+        if (paused || cinematic.isActive() || finalWarning.isActive()) {
             return;
         }
         if (inside(event.getX(), event.getY(), BACK_X, BACK_Y)) {
