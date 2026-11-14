@@ -37,13 +37,13 @@ public final class SkillSystem {
 
     public void castSkill(Fighter attacker, Fighter defender) {
         boolean right = defender.getX() >= attacker.getX();
-        pending.add(new PendingCast(CastKind.SKILL, attacker, right,
+        pending.add(new PendingCast(CastKind.SKILL, attacker, defender, right,
                 defender.getX(), skillDelay(attacker.getHero().id())));
     }
 
     public void castSpecial(Fighter attacker, Fighter defender) {
         boolean right = defender.getX() >= attacker.getX();
-        pending.add(new PendingCast(CastKind.SPECIAL, attacker, right,
+        pending.add(new PendingCast(CastKind.SPECIAL, attacker, defender, right,
                 defender.getX(), specialDelay(attacker.getHero().id())));
     }
 
@@ -91,15 +91,16 @@ public final class SkillSystem {
         }
     }
 
-    private void spawnSpecial(Fighter attacker, boolean right, double targetX) {
+    private void spawnSpecial(Fighter attacker, Fighter defender, boolean right,
+                              double targetX) {
         impacts.add(new Impact(attacker, true));
         switch (attacker.getHero().id()) {
-            case "rizal" -> effects.add(AreaEffect.giantBook(attacker, targetX));
+            case "rizal" -> effects.add(AreaEffect.giantBook(attacker, defender));
             case "bonifacio" -> effects.add(AreaEffect.shockwave(attacker));
             case "luna" -> {
-                effects.add(AreaEffect.explosion(attacker, targetX - 60, 0.08));
-                effects.add(AreaEffect.explosion(attacker, targetX, 0.22));
-                effects.add(AreaEffect.explosion(attacker, targetX + 60, 0.36));
+                effects.add(AreaEffect.explosion(attacker, defender, -120, 0.10));
+                effects.add(AreaEffect.explosion(attacker, defender, 0, 0.28));
+                effects.add(AreaEffect.explosion(attacker, defender, 120, 0.46));
             }
             case "mabini" -> effects.add(AreaEffect.lightBeam(attacker, right));
             case "lapulapu" -> projectiles.add(Projectile.tidalWave(attacker, right));
@@ -111,7 +112,7 @@ public final class SkillSystem {
 
     public void castRizalBook(Fighter attacker, Fighter defender) {
         boolean right = defender.getX() >= attacker.getX();
-        pending.add(new PendingCast(CastKind.BOOK, attacker, right,
+        pending.add(new PendingCast(CastKind.BOOK, attacker, defender, right,
                 defender.getX(), 0.10));
     }
 
@@ -128,7 +129,8 @@ public final class SkillSystem {
             }
             pending.remove(i);
             switch (cast.kind) {
-                case SPECIAL -> spawnSpecial(cast.attacker, cast.right, cast.defenderX);
+                case SPECIAL -> spawnSpecial(cast.attacker, cast.defender, cast.right,
+                        cast.defenderX);
                 case SKILL -> spawnSkill(cast.attacker, cast.right);
                 case BOOK -> projectiles.add(Projectile.book(cast.attacker, cast.right));
             }
@@ -161,6 +163,9 @@ public final class SkillSystem {
 
         for (AreaEffect effect : List.copyOf(effects)) {
             effect.update(dt);
+            if (effect.consumeImpactMoment()) {
+                impacts.add(new Impact(effect.getOwner(), true));
+            }
             if (!effect.isAlive() || effect.hasHit() || !effect.isActive()
                     || !effect.getOwner().isAlive()) {
                 continue;
@@ -172,6 +177,18 @@ public final class SkillSystem {
             }
             if (effect.isHigh() && defender.isDucking()) {
                 continue;
+            }
+
+            if (effect.getKind() == AreaEffect.Kind.GIANT_BOOK
+                    || effect.getKind() == AreaEffect.Kind.EXPLOSION) {
+                if (effect.getTarget() == defender) {
+                    boolean blocked = defender.isBlocking()
+                            && defender.isFacing(effect.getOwner());
+                    effect.markHit();
+                    combat.applyHit(effect.getOwner(), defender,
+                            effect.getDamage(), blocked);
+                    continue;
+                }
             }
 
             Rectangle2D hitbox = effect.getHitbox();
@@ -193,14 +210,16 @@ public final class SkillSystem {
     private static final class PendingCast {
         private final CastKind kind;
         private final Fighter attacker;
+        private final Fighter defender;
         private final boolean right;
         private final double defenderX;
         private double remaining;
 
-        private PendingCast(CastKind kind, Fighter attacker, boolean right,
-                            double defenderX, double remaining) {
+        private PendingCast(CastKind kind, Fighter attacker, Fighter defender,
+                            boolean right, double defenderX, double remaining) {
             this.kind = kind;
             this.attacker = attacker;
+            this.defender = defender;
             this.right = right;
             this.defenderX = defenderX;
             this.remaining = remaining;

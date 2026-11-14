@@ -5,6 +5,9 @@ import com.bakbakan.util.GameConfig;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.CycleMethod;
+import javafx.scene.paint.RadialGradient;
+import javafx.scene.paint.Stop;
 import javafx.scene.shape.ArcType;
 import javafx.scene.shape.StrokeLineCap;
 
@@ -214,22 +217,56 @@ public final class Projectile {
 
     private void drawTidalWave(GraphicsContext gc) {
         gc.scale(direction, 1);
-        gc.setFill(Color.web("#2e86de", 0.35));
+
+        gc.setFill(new RadialGradient(0, 0, 0, 20, 120, false,
+                CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#bfe9ff", 0.35)),
+                new Stop(1, Color.web("#bfe9ff", 0))));
+        gc.fillOval(-120, -100, 240, 240);
+
+        gc.setFill(Color.web("#1b6fb8", 0.30));
         gc.fillPolygon(
-                new double[]{-60, -20, 16, 52, 68, 46, 8, -28, -60},
-                new double[]{36, 14, 22, 4, 34, 50, 42, 52, 50}, 9);
-        gc.setFill(Color.web("#1b6fb8", 0.8));
+                new double[]{-78, -34, 8, 44, 76, 58, 16, -30, -78},
+                new double[]{48, 6, 16, -8, 30, 52, 44, 56, 54}, 9);
+
+        gc.setFill(Color.web("#2e86de", 0.85));
         gc.fillPolygon(
-                new double[]{-58, -24, 6, 36, 60, 40, 2, -34, -58},
-                new double[]{40, 24, 30, 16, 42, 50, 46, 52, 50}, 9);
-        gc.setFill(Color.web("#d6f1ff", 0.9));
-        gc.fillOval(-34, 20, 16, 12);
-        gc.fillOval(-10, 14, 14, 10);
-        gc.fillOval(12, 18, 18, 12);
-        gc.fillOval(34, 28, 12, 9);
-        gc.setStroke(Color.web("#eaf9ff", 0.8));
-        gc.setLineWidth(3);
-        gc.strokeArc(-40, 6, 62, 42, -40, 120, ArcType.OPEN);
+                new double[]{-70, -28, 6, 38, 66, 48, 10, -36, -70},
+                new double[]{44, 14, 22, 2, 34, 50, 46, 54, 52}, 9);
+
+        gc.setFill(Color.web("#54b7f0", 0.9));
+        gc.fillPolygon(
+                new double[]{-62, -26, 4, 30, 52, 40, 6, -32, -62},
+                new double[]{40, 22, 28, 14, 36, 48, 44, 50, 48}, 9);
+
+        gc.setFill(Color.web("#d6f1ff", 0.95));
+        gc.fillOval(-44, 12, 20, 15);
+        gc.fillOval(-14, 4, 18, 13);
+        gc.fillOval(16, 10, 22, 15);
+        gc.fillOval(42, 24, 15, 11);
+
+        gc.setStroke(Color.web("#eaf9ff", 0.9));
+        gc.setLineCap(StrokeLineCap.ROUND);
+        gc.setLineWidth(4);
+        gc.beginPath();
+        gc.moveTo(-48, 8);
+        gc.bezierCurveTo(-20, -22, -4, -30, 26, -18);
+        gc.bezierCurveTo(40, -12, 50, -4, 56, 6);
+        gc.stroke();
+
+        for (int i = 0; i < 9; i++) {
+            double s = (Math.sin(age * 7 + i * 12.9898) * 43758.5453) % 1;
+            if (s < 0) {
+                s += 1;
+            }
+            double px = -50 + s * 120;
+            double py = 6 - age * 40 - s * 30;
+            gc.setFill(Color.web("#eaf9ff", 0.6));
+            gc.fillOval(px, py, 3 + s * 4, 3 + s * 4);
+        }
+
+        gc.setFill(Color.web("#0b4f74", 0.25));
+        gc.fillOval(-70, 46, 150, 12);
     }
 
     public boolean isHigh() {
