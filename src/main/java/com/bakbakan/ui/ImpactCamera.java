@@ -1,5 +1,6 @@
 package com.bakbakan.ui;
 
+import com.bakbakan.util.BloodFX;
 import com.bakbakan.util.GameConfig;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
@@ -87,11 +88,15 @@ public final class ImpactCamera {
         double p = clamp01(timer / duration);
         double fade = 1 - p;
 
-        double flashWindow = special ? 0.14 : 0.07;
-        double flash = Math.max(0, 1 - timer / flashWindow);
-        if (flash > 0) {
-            gc.setFill(alpha(Color.WHITE, (special ? 0.5 : 0.28) * flash));
-            gc.fillRect(0, 0, WIDTH, HEIGHT);
+        if (special) {
+            BloodFX.screenSplatter(gc, focusX, focusY, p, 1.0);
+        } else {
+            double flashWindow = 0.07;
+            double flash = Math.max(0, 1 - timer / flashWindow);
+            if (flash > 0) {
+                gc.setFill(alpha(Color.web("#9c0f1c"), 0.26 * flash));
+                gc.fillRect(0, 0, WIDTH, HEIGHT);
+            }
         }
 
         int lines = special ? 30 : 16;
@@ -108,11 +113,11 @@ public final class ImpactCamera {
                     focusY + Math.sin(angle) * outer);
         }
 
-        if (p < 0.55) {
+        if (!special && p < 0.55) {
             double r = 30 + p * 460;
-            double a = (1 - p / 0.55) * (special ? 0.55 : 0.30);
+            double a = (1 - p / 0.55) * 0.30;
             gc.setStroke(alpha(accent, a));
-            gc.setLineWidth(special ? 5 : 3);
+            gc.setLineWidth(3);
             gc.strokeOval(focusX - r, focusY - r * 0.62, r * 2, r * 1.24);
         }
 

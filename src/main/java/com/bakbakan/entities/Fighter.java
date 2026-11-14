@@ -43,6 +43,7 @@ public class Fighter extends Entity {
     private double hitStun;
     private double hitFlash;
     private double walkPhase;
+    private String spriteId;
 
     public Fighter(String id, HeroData hero, double x, boolean playerControlled, GameEventBus bus) {
         this(id, hero, x, playerControlled, bus,
@@ -380,6 +381,14 @@ public class Fighter extends Entity {
 
     public HeroData getHero() {
         return hero;
+    }
+
+    public String getSpriteId() {
+        return spriteId != null ? spriteId : hero.id();
+    }
+
+    public void setSpriteId(String spriteId) {
+        this.spriteId = spriteId;
     }
 
     public boolean isPlayerControlled() {

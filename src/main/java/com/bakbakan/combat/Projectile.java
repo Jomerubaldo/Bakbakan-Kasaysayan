@@ -1,6 +1,7 @@
 package com.bakbakan.combat;
 
 import com.bakbakan.entities.Fighter;
+import com.bakbakan.util.BloodFX;
 import com.bakbakan.util.GameConfig;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.canvas.GraphicsContext;
@@ -35,6 +36,7 @@ public final class Projectile {
     private double rotation;
     private boolean alive = true;
     private boolean hit;
+    private boolean special;
 
     private Projectile(Kind kind, Fighter owner, double damage, boolean high,
                        double x, double y, double vx, double vy,
@@ -76,6 +78,47 @@ public final class Projectile {
                 startX(owner, facingRight), owner.getY() - 112,
                 speed(950, facingRight), 0,
                 36, 10, 1.2, 0, facingRight);
+    }
+
+    public static Projectile saberCommand(Fighter owner, boolean facingRight) {
+        return new Projectile(Kind.KAMPILAN_WAVE, owner,
+                owner.scaleDamage(CombatConstants.SKILL_DAMAGE_SABER_COMMAND), false,
+                startX(owner, facingRight), owner.getY() - 100,
+                speed(540, facingRight), 0,
+                74, 60, 0.9, 0, facingRight);
+    }
+
+    public static Projectile boloStrike(Fighter owner, boolean facingRight) {
+        return new Projectile(Kind.KAMPILAN_WAVE, owner,
+                owner.scaleDamage(CombatConstants.SKILL_DAMAGE_BOLO_STRIKE), false,
+                startX(owner, facingRight), owner.getY() - 84,
+                speed(470, facingRight), 0,
+                58, 46, 0.9, 0, facingRight);
+    }
+
+    public static Projectile rifleBurst(Fighter owner, boolean facingRight,
+                                        double heightOffset) {
+        return new Projectile(Kind.RIFLE, owner,
+                owner.scaleDamage(CombatConstants.SKILL_DAMAGE_RIFLE_BURST_HIT), true,
+                startX(owner, facingRight), owner.getY() - 112 + heightOffset,
+                speed(1050, facingRight), 0,
+                36, 10, 1.0, 0, facingRight);
+    }
+
+    public static Projectile heavyRifle(Fighter owner, boolean facingRight) {
+        return new Projectile(Kind.RIFLE, owner,
+                owner.scaleDamage(CombatConstants.SKILL_DAMAGE_HEAVY_RIFLE), true,
+                startX(owner, facingRight), owner.getY() - 112,
+                speed(820, facingRight), 0,
+                48, 12, 1.2, 0, facingRight);
+    }
+
+    public static Projectile arquebus(Fighter owner, boolean facingRight) {
+        return new Projectile(Kind.RIFLE, owner,
+                owner.scaleDamage(CombatConstants.SKILL_DAMAGE_ARQUEBUS), true,
+                startX(owner, facingRight), owner.getY() - 108,
+                speed(620, facingRight), 0,
+                44, 16, 1.4, 0, facingRight);
     }
 
     public static Projectile quill(Fighter owner, boolean facingRight) {
@@ -173,6 +216,19 @@ public final class Projectile {
     }
 
     private void drawRifle(GraphicsContext gc) {
+        String spriteId = owner.getSpriteId();
+        if ("boss_janolino".equals(spriteId)) {
+            drawGuardBurst(gc);
+            return;
+        }
+        if ("boss_macarthur".equals(spriteId)) {
+            drawHeavyRifle(gc);
+            return;
+        }
+        if ("boss_magellan".equals(spriteId)) {
+            drawArquebus(gc);
+            return;
+        }
         gc.setStroke(Color.web("#f4c542", 0.25));
         gc.setLineWidth(12);
         gc.strokeLine(-direction * 56, 0, 0, 0);
@@ -182,6 +238,47 @@ public final class Projectile {
         gc.setFill(Color.web("#f4c542"));
         gc.fillOval(-4, -4, 8, 8);
         gc.setFill(Color.WHITE);
+        gc.fillOval(-2, -2, 4, 4);
+    }
+
+    private void drawGuardBurst(GraphicsContext gc) {
+        gc.setStroke(Color.web("#c0392b", 0.22));
+        gc.setLineWidth(11);
+        gc.strokeLine(-direction * 52, 0, 0, 0);
+        gc.setStroke(Color.web("#ff8a7a", 0.95));
+        gc.setLineWidth(3);
+        gc.strokeLine(-direction * 46, 0, 0, 0);
+        gc.setFill(Color.web("#e74c3c"));
+        gc.fillOval(-4, -4, 8, 8);
+        gc.setFill(Color.WHITE);
+        gc.fillOval(-2, -2, 4, 4);
+    }
+
+    private void drawHeavyRifle(GraphicsContext gc) {
+        gc.setStroke(Color.web("#3f6fa8", 0.24));
+        gc.setLineWidth(16);
+        gc.strokeLine(-direction * 64, 0, 0, 0);
+        gc.setStroke(Color.web("#dce9ff", 0.95));
+        gc.setLineWidth(4);
+        gc.strokeLine(-direction * 56, 0, 0, 0);
+        gc.setFill(Color.web("#8fc2ff"));
+        gc.fillOval(-5, -5, 10, 10);
+        gc.setFill(Color.WHITE);
+        gc.fillOval(-2, -2, 4, 4);
+    }
+
+    private void drawArquebus(GraphicsContext gc) {
+        gc.setFill(Color.web("#e8e0d0", 0.35));
+        for (int i = 0; i < 4; i++) {
+            double px = -direction * (30 + i * 18);
+            double size = 12 - i * 2;
+            gc.fillOval(px - size / 2, -size / 2, size, size);
+        }
+        gc.setFill(Color.web("#2a2320"));
+        gc.fillOval(-5, -5, 10, 10);
+        gc.setFill(Color.web("#c7cdd6"));
+        gc.fillOval(-3, -3, 6, 6);
+        gc.setFill(Color.web("#fff2b0", 0.8));
         gc.fillOval(-2, -2, 4, 4);
     }
 
@@ -202,6 +299,15 @@ public final class Projectile {
 
     private void drawKampilanWave(GraphicsContext gc) {
         gc.scale(direction, 1);
+        String spriteId = owner.getSpriteId();
+        if ("boss_polavieja".equals(spriteId)) {
+            drawSaberCommand(gc);
+            return;
+        }
+        if ("boss_makapagal".equals(spriteId)) {
+            drawBoloStrike(gc);
+            return;
+        }
         Color accent = Color.web(owner.getHero().accentColor());
         gc.setStroke(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 0.25));
         gc.setLineWidth(16);
@@ -213,6 +319,39 @@ public final class Projectile {
         gc.setLineWidth(2);
         gc.strokeArc(-22, -19, 48, 38, -70, 140, ArcType.OPEN);
         gc.setLineCap(StrokeLineCap.ROUND);
+    }
+
+    private void drawSaberCommand(GraphicsContext gc) {
+        gc.setStroke(Color.web("#d4af37", 0.22));
+        gc.setLineWidth(20);
+        gc.strokeArc(-38, -35, 82, 70, -72, 144, ArcType.OPEN);
+        gc.setStroke(Color.web("#f4c542", 0.95));
+        gc.setLineWidth(7);
+        gc.strokeArc(-38, -35, 82, 70, -72, 144, ArcType.OPEN);
+        gc.setStroke(Color.web("#fff6c8", 0.9));
+        gc.setLineWidth(2.5);
+        gc.strokeArc(-30, -27, 66, 54, -72, 144, ArcType.OPEN);
+        gc.setStroke(Color.web("#a3171b", 0.7));
+        gc.setLineWidth(2);
+        gc.strokeArc(-46, -42, 98, 84, -66, 132, ArcType.OPEN);
+        gc.setLineCap(StrokeLineCap.ROUND);
+        gc.setFill(Color.web("#d4af37", 0.5));
+        gc.fillOval(20, -6, 10, 10);
+    }
+
+    private void drawBoloStrike(GraphicsContext gc) {
+        gc.setStroke(Color.web("#5a3f2b", 0.30));
+        gc.setLineWidth(16);
+        gc.strokeArc(-28, -24, 62, 50, -66, 132, ArcType.OPEN);
+        gc.setStroke(Color.web("#c9d1dc"));
+        gc.setLineWidth(6);
+        gc.strokeArc(-28, -24, 62, 50, -66, 132, ArcType.OPEN);
+        gc.setStroke(Color.web("#8a2b23"));
+        gc.setLineWidth(2.5);
+        gc.strokeArc(-20, -17, 46, 36, -66, 132, ArcType.OPEN);
+        gc.setLineCap(StrokeLineCap.ROUND);
+        gc.setFill(Color.web("#7a4a2a"));
+        gc.fillRoundRect(-14, 14, 16, 8, 3, 3);
     }
 
     private void drawTidalWave(GraphicsContext gc) {
@@ -265,12 +404,22 @@ public final class Projectile {
             gc.fillOval(px, py, 3 + s * 4, 3 + s * 4);
         }
 
+        BloodFX.splatter(gc, 4, 16, Math.min(1, age * 1.1), 0.45, 1, 52);
+
         gc.setFill(Color.web("#0b4f74", 0.25));
         gc.fillOval(-70, 46, 150, 12);
     }
 
     public boolean isHigh() {
         return high;
+    }
+
+    public void markSpecial() {
+        special = true;
+    }
+
+    public boolean isSpecial() {
+        return special;
     }
 
     public boolean isAlive() {

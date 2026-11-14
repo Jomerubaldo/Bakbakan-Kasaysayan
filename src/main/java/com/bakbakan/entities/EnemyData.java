@@ -7,10 +7,16 @@ public record EnemyData(
         HeroData moveset,
         double maxHealth,
         double damageMultiplier,
-        boolean boss) {
+        boolean boss,
+        String spriteId) {
 
     public static final String SPANISH_SOLDIER = "spanish_soldier";
     public static final String AMERICAN_SOLDIER = "american_soldier";
+
+    public EnemyData(String name, HeroData moveset, double maxHealth,
+                     double damageMultiplier, boolean boss) {
+        this(name, moveset, maxHealth, damageMultiplier, boss, moveset.id());
+    }
 
     public static EnemyData forRound(int round, HeroData playerHero) {
         int clamped = Math.max(1, Math.min(CombatConstants.TOTAL_ROUNDS, round));

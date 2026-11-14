@@ -726,21 +726,21 @@ public final class SpecialCinematic {
     private static String[] titleLines(String id) {
         return switch (id) {
             case "rizal" -> new String[]{"NOLI ME", "TANGERE"};
-            case "bonifacio" -> new String[]{"SIGAW NG", "PAGSASARILI"};
-            case "luna" -> new String[]{"HENERAL", "LUNA"};
-            case "mabini" -> new String[]{"SINAG NG", "KATWIRAN"};
-            case "lapulapu" -> new String[]{"ALON NG", "MACTAN"};
+            case "bonifacio" -> new String[]{"CRY OF", "FREEDOM"};
+            case "luna" -> new String[]{"GENERAL", "LUNA"};
+            case "mabini" -> new String[]{"LIGHT OF", "REASON"};
+            case "lapulapu" -> new String[]{"WAVES OF", "MACTAN"};
             default -> new String[]{"SPECIAL", "MOVE"};
         };
     }
 
     private static String tagline(String id) {
         return switch (id) {
-            case "rizal" -> "Ang lakas ng panulat.";
-            case "bonifacio" -> "Kapatiran at tapang.";
-            case "luna" -> "Disiplina at artilerya.";
-            case "mabini" -> "Isip ang sandata.";
-            case "lapulapu" -> "Lakas ng dagat at tapang.";
+            case "rizal" -> "The power of the pen.";
+            case "bonifacio" -> "Brotherhood and courage.";
+            case "luna" -> "Discipline and artillery.";
+            case "mabini" -> "The mind is the weapon.";
+            case "lapulapu" -> "Strength of the sea and courage.";
             default -> "";
         };
     }

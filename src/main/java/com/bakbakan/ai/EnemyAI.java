@@ -295,30 +295,40 @@ public class EnemyAI {
     }
 
     private double skillRange() {
-        return switch (self.getHero().id()) {
+        return switch (self.getSpriteId()) {
             case "bonifacio" -> 280;
             case "lapulapu" -> 560;
             case "luna" -> 760;
             case "mabini" -> 700;
             case "spanish_soldier" -> 600;
             case "american_soldier" -> 660;
+            case "boss_polavieja" -> 800;
+            case "boss_makapagal" -> 320;
+            case "boss_janolino" -> 760;
+            case "boss_macarthur" -> 840;
+            case "boss_magellan" -> 680;
             case "final_boss" -> 780;
             default -> 620;
         };
     }
 
     private double specialRange() {
-        return switch (self.getHero().id()) {
+        return switch (self.getSpriteId()) {
             case "bonifacio" -> 270;
             case "lapulapu" -> 600;
             case "spanish_soldier", "american_soldier" -> 0;
+            case "boss_polavieja" -> 900;
+            case "boss_makapagal" -> 900;
+            case "boss_janolino" -> 290;
+            case "boss_macarthur" -> 950;
+            case "boss_magellan" -> 430;
             case "final_boss" -> 900;
             default -> 900;
         };
     }
 
     private double preferredDistance() {
-        return switch (self.getHero().id()) {
+        return switch (self.getSpriteId()) {
             case "rizal" -> 340;
             case "luna" -> 190;
             case "mabini" -> 210;
@@ -326,6 +336,11 @@ public class EnemyAI {
             case "lapulapu" -> 120;
             case "spanish_soldier" -> 260;
             case "american_soldier" -> 290;
+            case "boss_polavieja" -> 300;
+            case "boss_makapagal" -> 140;
+            case "boss_janolino" -> 220;
+            case "boss_macarthur" -> 320;
+            case "boss_magellan" -> 180;
             case "final_boss" -> 230;
             default -> 140;
         };

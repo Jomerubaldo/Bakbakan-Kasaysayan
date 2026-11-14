@@ -38,13 +38,13 @@ public final class SkillSystem {
     public void castSkill(Fighter attacker, Fighter defender) {
         boolean right = defender.getX() >= attacker.getX();
         pending.add(new PendingCast(CastKind.SKILL, attacker, defender, right,
-                defender.getX(), skillDelay(attacker.getHero().id())));
+                defender.getX(), skillDelay(attacker.getSpriteId())));
     }
 
     public void castSpecial(Fighter attacker, Fighter defender) {
         boolean right = defender.getX() >= attacker.getX();
         pending.add(new PendingCast(CastKind.SPECIAL, attacker, defender, right,
-                defender.getX(), specialDelay(attacker.getHero().id())));
+                defender.getX(), specialDelay(attacker.getSpriteId())));
     }
 
     private static double skillDelay(String id) {
@@ -56,6 +56,11 @@ public final class SkillSystem {
             case "lapulapu" -> 0.36 * CombatConstants.SKILL_CAST_LOCK;
             case "spanish_soldier", "american_soldier" ->
                     0.30 * CombatConstants.SKILL_CAST_LOCK;
+            case "boss_polavieja" -> 0.30 * CombatConstants.SKILL_CAST_LOCK;
+            case "boss_makapagal" -> 0.24 * CombatConstants.SKILL_CAST_LOCK;
+            case "boss_janolino" -> 0.30 * CombatConstants.SKILL_CAST_LOCK;
+            case "boss_macarthur" -> 0.34 * CombatConstants.SKILL_CAST_LOCK;
+            case "boss_magellan" -> 0.42 * CombatConstants.SKILL_CAST_LOCK;
             case "final_boss" -> 0.32 * CombatConstants.SKILL_CAST_LOCK;
             default -> 0.12;
         };
@@ -68,6 +73,11 @@ public final class SkillSystem {
             case "luna" -> 0.34 * CombatConstants.SPECIAL_CAST_LOCK - 0.08;
             case "mabini" -> 0.42 * CombatConstants.SPECIAL_CAST_LOCK - 0.05;
             case "lapulapu" -> 0.44 * CombatConstants.SPECIAL_CAST_LOCK;
+            case "boss_polavieja" -> 0.20 * CombatConstants.SPECIAL_CAST_LOCK;
+            case "boss_makapagal" -> 0.24 * CombatConstants.SPECIAL_CAST_LOCK;
+            case "boss_janolino" -> 0.30 * CombatConstants.SPECIAL_CAST_LOCK;
+            case "boss_macarthur" -> 0.34 * CombatConstants.SPECIAL_CAST_LOCK;
+            case "boss_magellan" -> 0.24 * CombatConstants.SPECIAL_CAST_LOCK;
             case "final_boss" -> 0.36 * CombatConstants.SPECIAL_CAST_LOCK;
             default -> 0.16;
         };
@@ -75,7 +85,7 @@ public final class SkillSystem {
 
     private void spawnSkill(Fighter attacker, boolean right) {
         impacts.add(new Impact(attacker, false));
-        switch (attacker.getHero().id()) {
+        switch (attacker.getSpriteId()) {
             case "rizal" -> projectiles.add(Projectile.ink(attacker, right));
             case "bonifacio" -> {
                 double targetX = attacker.getX() + (right ? 220 : -220);
@@ -86,6 +96,15 @@ public final class SkillSystem {
             case "lapulapu" -> projectiles.add(Projectile.kampilanWave(attacker, right));
             case "spanish_soldier", "american_soldier", "final_boss" ->
                     projectiles.add(Projectile.rifle(attacker, right));
+            case "boss_polavieja" -> projectiles.add(Projectile.saberCommand(attacker, right));
+            case "boss_makapagal" -> projectiles.add(Projectile.boloStrike(attacker, right));
+            case "boss_janolino" -> {
+                projectiles.add(Projectile.rifleBurst(attacker, right, -18));
+                projectiles.add(Projectile.rifleBurst(attacker, right, 0));
+                projectiles.add(Projectile.rifleBurst(attacker, right, 18));
+            }
+            case "boss_macarthur" -> projectiles.add(Projectile.heavyRifle(attacker, right));
+            case "boss_magellan" -> projectiles.add(Projectile.arquebus(attacker, right));
             default -> {
             }
         }
@@ -94,20 +113,47 @@ public final class SkillSystem {
     private void spawnSpecial(Fighter attacker, Fighter defender, boolean right,
                               double targetX) {
         impacts.add(new Impact(attacker, true));
-        switch (attacker.getHero().id()) {
-            case "rizal" -> effects.add(AreaEffect.giantBook(attacker, defender));
-            case "bonifacio" -> effects.add(AreaEffect.shockwave(attacker));
+        switch (attacker.getSpriteId()) {
+            case "rizal" -> addSpecialEffect(AreaEffect.giantBook(attacker, defender));
+            case "bonifacio" -> addSpecialEffect(AreaEffect.shockwave(attacker));
             case "luna" -> {
-                effects.add(AreaEffect.explosion(attacker, defender, -120, 0.10));
-                effects.add(AreaEffect.explosion(attacker, defender, 0, 0.28));
-                effects.add(AreaEffect.explosion(attacker, defender, 120, 0.46));
+                addSpecialEffect(AreaEffect.explosion(attacker, defender, -120, 0.10));
+                addSpecialEffect(AreaEffect.explosion(attacker, defender, 0, 0.28));
+                addSpecialEffect(AreaEffect.explosion(attacker, defender, 120, 0.46));
             }
-            case "mabini" -> effects.add(AreaEffect.lightBeam(attacker, right));
-            case "lapulapu" -> projectiles.add(Projectile.tidalWave(attacker, right));
-            case "final_boss" -> effects.add(AreaEffect.firingSquad(attacker, right));
+            case "mabini" -> addSpecialEffect(AreaEffect.lightBeam(attacker, defender, right));
+            case "lapulapu" -> addSpecialProjectile(Projectile.tidalWave(attacker, right));
+            case "boss_polavieja" ->
+                    addSpecialEffect(AreaEffect.firingSquad(attacker, defender, right));
+            case "boss_makapagal" -> {
+                addSpecialEffect(AreaEffect.rifleStrike(attacker, defender, -34, 0.06));
+                addSpecialEffect(AreaEffect.rifleStrike(attacker, defender, 0, 0.20));
+                addSpecialEffect(AreaEffect.rifleStrike(attacker, defender, 34, 0.34));
+            }
+            case "boss_janolino" -> {
+                addSpecialEffect(AreaEffect.saberStrike(attacker, defender, -14, 0.04));
+                addSpecialEffect(AreaEffect.saberStrike(attacker, defender, 16, 0.16));
+                addSpecialEffect(AreaEffect.saberStrike(attacker, defender, 0, 0.28));
+            }
+            case "boss_macarthur" ->
+                    addSpecialEffect(AreaEffect.bombardment(attacker, defender));
+            case "boss_magellan" ->
+                    addSpecialEffect(AreaEffect.conquistadorCharge(attacker, defender.getX()));
+            case "final_boss" ->
+                    addSpecialEffect(AreaEffect.firingSquad(attacker, defender, right));
             default -> {
             }
         }
+    }
+
+    private void addSpecialEffect(AreaEffect effect) {
+        effect.markSpecial();
+        effects.add(effect);
+    }
+
+    private void addSpecialProjectile(Projectile projectile) {
+        projectile.markSpecial();
+        projectiles.add(projectile);
     }
 
     public void castRizalBook(Fighter attacker, Fighter defender) {
@@ -156,7 +202,7 @@ public final class SkillSystem {
                 projectile.markHit();
                 projectile.setAlive(false);
                 combat.applyHit(projectile.getOwner(), defender,
-                        projectile.getDamage(), blocked);
+                        projectile.getDamage(), blocked, projectile.isSpecial());
             }
         }
         projectiles.removeIf(projectile -> !projectile.isAlive());
@@ -186,7 +232,7 @@ public final class SkillSystem {
                             && defender.isFacing(effect.getOwner());
                     effect.markHit();
                     combat.applyHit(effect.getOwner(), defender,
-                            effect.getDamage(), blocked);
+                            effect.getDamage(), blocked, effect.isSpecial());
                     continue;
                 }
             }
@@ -197,7 +243,7 @@ public final class SkillSystem {
                         && defender.isFacing(effect.getOwner());
                 effect.markHit();
                 combat.applyHit(effect.getOwner(), defender,
-                        effect.getDamage(), blocked);
+                        effect.getDamage(), blocked, effect.isSpecial());
             }
         }
         effects.removeIf(effect -> !effect.isAlive());

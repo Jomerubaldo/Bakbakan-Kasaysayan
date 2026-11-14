@@ -56,6 +56,16 @@ public final class CombatConstants {
     public static final double SPECIAL_DAMAGE_TIDAL_WAVE = 34;
     public static final double SPECIAL_DAMAGE_FIRING_SQUAD = 32;
 
+    public static final double SKILL_DAMAGE_SABER_COMMAND = 22;
+    public static final double SKILL_DAMAGE_BOLO_STRIKE = 20;
+    public static final double SKILL_DAMAGE_RIFLE_BURST_HIT = 8;
+    public static final double SKILL_DAMAGE_HEAVY_RIFLE = 26;
+    public static final double SKILL_DAMAGE_ARQUEBUS = 28;
+    public static final double SPECIAL_DAMAGE_VOLLEY_HIT = 10;
+    public static final double SPECIAL_DAMAGE_AMBUSH_HIT = 11;
+    public static final double SPECIAL_DAMAGE_BOMBARDMENT = 32;
+    public static final double SPECIAL_DAMAGE_CONQUISTADOR_CHARGE = 34;
+
     private CombatConstants() {
     }
 }

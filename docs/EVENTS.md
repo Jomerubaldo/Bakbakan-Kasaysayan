@@ -13,7 +13,7 @@ Screens then request their own music with `SoundRequestEvent`.
 
 | Event name | Fired by | Handled by | Purpose |
 |---|---|---|---|
-| HitEvent | CombatSystem | Hud | A fighter's attack connected; carries attacker/target, final damage and whether it was blocked. The HUD uses it to fill special bars. |
+| HitEvent | CombatSystem | Hud, FightScreen | A fighter's attack connected; carries attacker/target, final damage, whether it was blocked, and whether it came from an R special. The HUD fills special bars; FightScreen spawns blood droplets, with a heavier burst on special hits. |
 | DamageEvent | CombatSystem | Hud | Health changed for a fighter; carries amount and remaining health. The HUD health bars update only from this event. |
 | ManaChangedEvent | Fighter | Hud | Mana changed from regeneration or a skill cost; the HUD mana bars update only from this event. |
 | SpecialReadyEvent | Fighter | Hud | Special bar reached 100; the HUD shows "SPECIAL READY". |
@@ -63,7 +63,7 @@ Screens then request their own music with `SoundRequestEvent`.
 2. K spends 30 mana and fires `SkillUsedEvent` plus `skill_<heroId>`. With less
    than 30 mana the skill is refused, `no_mana` plays, and "NO MANA" floats above
    the player.
-3. E requires a full special bar. It fires `SpecialUsedEvent` plus
+3. R requires a full special bar. It fires `SpecialUsedEvent` plus
    `special_<heroId>`, resets the bar to 0, and starts the hero special.
 4. `SkillSystem` spawns code-drawn projectiles and area effects. All damage goes
    through `CombatSystem.applyHit`, so every hit fires `HitEvent`, `DamageEvent`
@@ -76,7 +76,7 @@ Screens then request their own music with `SoundRequestEvent`.
    projectiles, waves, explosions and the giant book still hit.
 8. Rizal's J is a thrown book projectile; other heroes keep melee J attacks.
 
-| Hero | K skill | E special | Projectile/effect |
+| Hero | K skill | R special | Projectile/effect |
 |---|---|---|---|
 | Rizal | Ink splash | Giant Noli book slam | Ink projectile; falling giant book |
 | Bonifacio | Katipunan flag dash | Sigaw ng Pugad Lawin shockwave | Forward dash; expanding ring |

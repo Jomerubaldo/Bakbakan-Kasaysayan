@@ -11,13 +11,20 @@ public class HitEvent extends Event {
     private final String targetId;
     private final double damage;
     private final boolean blocked;
+    private final boolean special;
 
     public HitEvent(String attackerId, String targetId, double damage, boolean blocked) {
+        this(attackerId, targetId, damage, blocked, false);
+    }
+
+    public HitEvent(String attackerId, String targetId, double damage, boolean blocked,
+                    boolean special) {
         super(HIT);
         this.attackerId = attackerId;
         this.targetId = targetId;
         this.damage = damage;
         this.blocked = blocked;
+        this.special = special;
     }
 
     public String getAttackerId() {
@@ -34,5 +41,9 @@ public class HitEvent extends Event {
 
     public boolean isBlocked() {
         return blocked;
+    }
+
+    public boolean isSpecial() {
+        return special;
     }
 }

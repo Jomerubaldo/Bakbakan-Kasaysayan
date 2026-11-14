@@ -28,13 +28,19 @@ public final class FinalWarningCinematic {
 
     private HeroData hero;
     private HeroData boss;
+    private String bossSpriteId;
     private int slide;
     private double slideTime;
     private boolean active;
 
     public void start(HeroData hero, HeroData boss) {
+        start(hero, boss, boss != null ? boss.id() : null);
+    }
+
+    public void start(HeroData hero, HeroData boss, String bossSpriteId) {
         this.hero = hero;
         this.boss = boss;
+        this.bossSpriteId = bossSpriteId;
         this.slide = 0;
         this.slideTime = 0;
         this.active = true;
@@ -44,6 +50,7 @@ public final class FinalWarningCinematic {
         active = false;
         hero = null;
         boss = null;
+        bossSpriteId = null;
     }
 
     public boolean isActive() {
@@ -136,7 +143,7 @@ public final class FinalWarningCinematic {
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setFill(Color.web("#8f9ab8"));
         gc.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 12));
-        gc.fillText("Pindutin ang ENTER upang magpatuloy",
+        gc.fillText("Press ENTER to continue",
                 GameConfig.WIDTH / 2.0, GameConfig.HEIGHT - 26);
     }
 
@@ -146,13 +153,13 @@ public final class FinalWarningCinematic {
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setFill(Color.web("#ff3b3b", 0.14 * pulse));
         gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 132));
-        gc.fillText("BABALA", GameConfig.WIDTH / 2.0 + 3, 258 + 3);
+        gc.fillText("WARNING", GameConfig.WIDTH / 2.0 + 3, 258 + 3);
         gc.setFill(Color.web("#ff6b6b", pulse));
-        gc.fillText("BABALA", GameConfig.WIDTH / 2.0, 258);
+        gc.fillText("WARNING", GameConfig.WIDTH / 2.0, 258);
 
         gc.setFill(Color.web("#f4c542"));
         gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 34));
-        gc.fillText("HULING ROUND", GameConfig.WIDTH / 2.0, 330);
+        gc.fillText("FINAL ROUND", GameConfig.WIDTH / 2.0, 330);
 
         gc.setStroke(Color.web("#ff6b6b", 0.55));
         gc.setLineWidth(2);
@@ -170,19 +177,19 @@ public final class FinalWarningCinematic {
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setFill(Color.web("#f4c542"));
         gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 34));
-        gc.fillText("ANG LIMANG BAYANI", GameConfig.WIDTH / 2.0, 142);
+        gc.fillText("THE FIVE HEROES", GameConfig.WIDTH / 2.0, 142);
 
         gc.setFill(Color.web("#b9c2da"));
         gc.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 15));
-        gc.fillText("Ang kanilang mga huling araw, ayon sa kasaysayan.",
+        gc.fillText("Their final days, as history recorded them.",
                 GameConfig.WIDTH / 2.0, 172);
 
         String[][] rows = {
-                {"Jose Rizal", "Disyembre 30, 1896", "Binaril sa Bagumbayan"},
-                {"Andres Bonifacio", "Mayo 10, 1897", "Binaril sa Maragondon"},
-                {"Antonio Luna", "Hunyo 5, 1899", "Pinaslang sa Cabanatuan"},
-                {"Apolinario Mabini", "Mayo 13, 1903", "Namatay sa cholera"},
-                {"Lapulapu", "Abril 27, 1521", "Nanalo sa Mactan"}
+                {"Jose Rizal", "December 30, 1896", "Shot at Bagumbayan"},
+                {"Andres Bonifacio", "May 10, 1897", "Shot at Maragondon"},
+                {"Antonio Luna", "June 5, 1899", "Killed at Cabanatuan"},
+                {"Apolinario Mabini", "May 13, 1903", "Died of cholera"},
+                {"Lapulapu", "April 27, 1521", "Won at Mactan"}
         };
 
         double top = 216;
@@ -251,12 +258,12 @@ public final class FinalWarningCinematic {
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setFill(Color.web("#f4c542", 0.8));
         gc.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 15));
-        gc.fillText("Ang kanyang alaala ay buhay sa bawat laban.",
+        gc.fillText("The memory lives on in every battle.",
                 GameConfig.WIDTH / 2.0, 600);
     }
 
     private void drawBoss(GraphicsContext gc, SpriteProvider sprites) {
-        sprites.renderPortrait(gc, boss, 985, 604, 2.45, false);
+        sprites.renderPortrait(gc, boss, bossSpriteId, 985, 604, 2.45, false);
 
         double pulse = 0.6 + 0.4 * Math.sin(slideTime * 4.0);
         gc.setFill(Color.web("#ff3b3b", 0.10 + 0.06 * pulse));
@@ -265,30 +272,37 @@ public final class FinalWarningCinematic {
         gc.setTextAlign(TextAlignment.LEFT);
         gc.setFill(Color.web("#ff6b6b"));
         gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
-        gc.fillText("HULING KALABAN", 120, 180);
+        gc.fillText("FINAL OPPONENT", 120, 180);
 
         gc.setFill(Color.web("#f4f6ff"));
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 62));
-        gc.fillText(boss.name(), 120, 252);
+        Font nameFont = Font.font("Segoe UI", FontWeight.BOLD, 46);
+        gc.setFont(nameFont);
+        double nameY = 248;
+        for (String line : wrap(boss.name(), nameFont, 580)) {
+            gc.fillText(line, 120, nameY);
+            nameY += 50;
+        }
 
+        double weaponY = nameY + 2;
         gc.setFill(Color.web("#f4c542"));
         gc.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 22));
-        gc.fillText("Ang anino ng kasaysayan", 120, 292);
+        gc.fillText(boss.weapon(), 120, weaponY);
 
+        double dividerY = weaponY + 24;
         gc.setStroke(Color.web("#ff6b6b", 0.55));
         gc.setLineWidth(2);
-        gc.strokeLine(120, 316, 700, 316);
+        gc.strokeLine(120, dividerY, 700, dividerY);
 
-        drawWrappedText(gc,
-                "Ako ang anino ng lahat ng naging dahilan ng inyong kamatayan. "
-                        + "Harapin mo ang kasaysayan, bayani.",
-                120, 362, 560, 34,
-                Font.font("Segoe UI", FontWeight.NORMAL, 22),
-                Color.web("#e8b4b8"), TextAlignment.LEFT);
+        double bodyY = dividerY + 44;
+        Font bodyFont = Font.font("Segoe UI", FontWeight.NORMAL, 21);
+        List<String> bodyLines = wrap(boss.description(), bodyFont, 560);
+        drawWrappedText(gc, boss.description(), 120, bodyY, 560, 30,
+                bodyFont, Color.web("#e8b4b8"), TextAlignment.LEFT);
 
+        double roundY = Math.min(614, bodyY + bodyLines.size() * 30 + 18);
         gc.setFill(Color.web("#f4c542", 0.9));
         gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 20));
-        gc.fillText("ROUND 5 — FINAL BATTLE", 120, 520);
+        gc.fillText("ROUND 5 — FINAL BATTLE", 120, roundY);
     }
 
     private void drawWrappedText(GraphicsContext gc, String text, double x, double y,
@@ -328,50 +342,47 @@ public final class FinalWarningCinematic {
         return switch (hero.id()) {
             case "rizal" -> new Story(
                     "Jose Rizal",
-                    "Hunyo 19, 1861 — Disyembre 30, 1896",
-                    "Binaril ng firing squad sa Bagumbayan.",
-                    "Inakusahan si Rizal ng rebelyon ng military court ng Espanya. "
-                            + "Inaprubahan ni Gobernador-Heneral Camilo de Polavieja "
-                            + "ang hatol na kamatayan. Binaril siya sa Bagumbayan "
-                            + "noong Disyembre 30, 1896. Ang kanyang mga nobela at tula "
-                            + "ang naging apoy ng rebolusyon.");
+                    "June 19, 1861 — December 30, 1896",
+                    "Executed by firing squad at Bagumbayan.",
+                    "A Spanish military court convicted Rizal of rebellion. "
+                            + "Governor-General Camilo de Polavieja approved the death "
+                            + "sentence. He was shot at Bagumbayan on December 30, 1896. "
+                            + "His novels and poems became the spark of the revolution.");
             case "bonifacio" -> new Story(
                     "Andres Bonifacio",
-                    "Nobyembre 30, 1863 — Mayo 10, 1897",
-                    "Binaril sa utos ng Council of War.",
-                    "Si Bonifacio at ang kapatid niyang si Procopio ay hinatulan "
-                            + "ng Council of War na pinamunuan ni Heneral Mariano Noriel. "
-                            + "Iniutos ni Emilio Aguinaldo na ipatupad ang hatol. "
-                            + "Si Major Lazaro Makapagal ang nagsagawa ng pagbaril "
-                            + "sa Maragondon noong Mayo 10, 1897. Kapatid ang pumatay "
-                            + "sa kapatid.");
+                    "November 30, 1863 — May 10, 1897",
+                    "Executed on orders of the Council of War.",
+                    "Bonifacio and his brother Procopio were sentenced by the Council "
+                            + "of War led by General Mariano Noriel. Emilio Aguinaldo "
+                            + "ordered the sentence carried out. Major Lazaro Makapagal "
+                            + "led the shooting at Maragondon on May 10, 1897. Brother "
+                            + "killed brother.");
             case "luna" -> new Story(
                     "Antonio Luna",
-                    "Oktubre 29, 1866 — Hunyo 5, 1899",
-                    "Pinaslang sa Cabanatuan.",
-                    "Sumugod si Luna sa Cabanatuan upang makipagpulong kay Aguinaldo. "
-                            + "Doon siya sinalakay ng mga miyembro ng Presidential Guard, "
-                            + "kasama si Kapitan Pedro Janolino. Mahigit 30 ang sugat niya. "
-                            + "Namatay siya sa plaza kasama ang aide niyang si "
-                            + "Col. Francisco Roman noong Hunyo 5, 1899.");
+                    "October 29, 1866 — June 5, 1899",
+                    "Assassinated at Cabanatuan.",
+                    "Luna rushed to Cabanatuan to meet with Aguinaldo. There he was "
+                            + "attacked by members of the Presidential Guard, including "
+                            + "Captain Pedro Janolino. He suffered more than 30 wounds. "
+                            + "He died in the plaza alongside his aide, Col. Francisco "
+                            + "Roman, on June 5, 1899.");
             case "mabini" -> new Story(
                     "Apolinario Mabini",
-                    "Hulyo 23, 1864 — Mayo 13, 1903",
-                    "Namatay sa cholera pagkatapos ng exile.",
-                    "Ipinatapon si Mabini ng mga Amerikano sa Guam dahil sa "
-                            + "pagtangging sumumpa ng katapatan. Pagbalik niya sa Manila "
-                            + "noong 1903, mahina na ang kanyang katawan. Namatay siya "
-                            + "sa cholera noong Mayo 13, 1903. Hindi siya natalo sa "
-                            + "labanan—dinaig siya ng sakit at ng pagkatapon.");
+                    "July 23, 1864 — May 13, 1903",
+                    "Died of cholera after exile.",
+                    "The Americans exiled Mabini to Guam for refusing to swear "
+                            + "allegiance. When he returned to Manila in 1903, his body "
+                            + "was already weak. He died of cholera on May 13, 1903. He "
+                            + "was never defeated in battle—disease and exile overcame "
+                            + "him.");
             default -> new Story(
                     "Lapulapu",
-                    "Ipinanganak bago ang 1521 — hindi tiyak ang petsa ng kamatayan",
-                    "Nanalo sa Mactan; hindi alam ang naging wakas.",
-                    "Pinamunuan ni Lapulapu ang mga mandirigma ng Mactan laban kay "
-                            + "Ferdinand Magellan noong Abril 27, 1521. Natalo ang "
-                            + "hukbong Espanyol at napatay si Magellan. Walang talaan "
-                            + "kung paano namatay si Lapulapu. Hindi siya natalo ng "
-                            + "mga mananakop.");
+                    "Born before 1521 — exact date of death unknown",
+                    "Won at Mactan; his final fate is unknown.",
+                    "Lapulapu led the warriors of Mactan against Ferdinand Magellan "
+                            + "on April 27, 1521. The Spanish force was defeated and "
+                            + "Magellan was killed. No record shows how Lapulapu died. "
+                            + "He was never defeated by the colonizers.");
         };
     }
 

@@ -27,7 +27,7 @@ public class MainApp extends Application {
         GameSession session = new GameSession();
 
         screenManager.registerScreen("Loading", () -> new LoadingScreen(assets, bus));
-        screenManager.registerScreen("MainMenu", () -> new MainMenuScreen(bus));
+        screenManager.registerScreen("MainMenu", () -> new MainMenuScreen(bus, assets));
         screenManager.registerScreen("HeroSelect", () -> new HeroSelectScreen(bus, session, assets));
         screenManager.registerScreen("Fight", () -> new FightScreen(bus, session, assets));
         screenManager.registerScreen("RoundWin",

@@ -1,6 +1,7 @@
 package com.bakbakan.combat;
 
 import com.bakbakan.entities.Fighter;
+import com.bakbakan.util.BloodFX;
 import com.bakbakan.util.GameConfig;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.canvas.GraphicsContext;
@@ -39,6 +40,7 @@ public final class AreaEffect {
     private boolean alive = true;
     private boolean impactMomentFired;
     private boolean anchored;
+    private boolean special;
     private double anchorX;
     private double anchorY;
 
@@ -90,18 +92,53 @@ public final class AreaEffect {
                 delay, 0.34, x, offsetX, 1, x, x);
     }
 
-    public static AreaEffect lightBeam(Fighter owner, boolean facingRight) {
-        return new AreaEffect(Kind.LIGHT_BEAM, owner, null,
+    public static AreaEffect lightBeam(Fighter owner, Fighter target,
+                                       boolean facingRight) {
+        return new AreaEffect(Kind.LIGHT_BEAM, owner, target,
                 owner.scaleDamage(CombatConstants.SPECIAL_DAMAGE_BEAM), true,
                 0.05, 0.50, owner.getX(), 0, facingRight ? 1 : -1,
                 owner.getX(), owner.getX());
     }
 
-    public static AreaEffect firingSquad(Fighter owner, boolean facingRight) {
-        return new AreaEffect(Kind.FIRING_SQUAD, owner, null,
+    public static AreaEffect firingSquad(Fighter owner, Fighter target,
+                                         boolean facingRight) {
+        return new AreaEffect(Kind.FIRING_SQUAD, owner, target,
                 owner.scaleDamage(CombatConstants.SPECIAL_DAMAGE_FIRING_SQUAD), true,
                 0.15, 0.45, owner.getX(), 0, facingRight ? 1 : -1,
                 owner.getX(), owner.getX());
+    }
+
+    public static AreaEffect rifleStrike(Fighter owner, Fighter target,
+                                         double offsetX, double delay) {
+        double x = target != null ? target.getX() : owner.getX();
+        boolean right = target == null || target.getX() >= owner.getX();
+        return new AreaEffect(Kind.EXPLOSION, owner, target,
+                owner.scaleDamage(CombatConstants.SPECIAL_DAMAGE_VOLLEY_HIT), true,
+                delay, 0.22, x, offsetX, right ? 1 : -1, x, x);
+    }
+
+    public static AreaEffect saberStrike(Fighter owner, Fighter target,
+                                         double offsetX, double delay) {
+        double x = target != null ? target.getX() : owner.getX();
+        boolean right = target == null || target.getX() >= owner.getX();
+        return new AreaEffect(Kind.EXPLOSION, owner, target,
+                owner.scaleDamage(CombatConstants.SPECIAL_DAMAGE_AMBUSH_HIT), false,
+                delay, 0.22, x, offsetX, right ? 1 : -1, x, x);
+    }
+
+    public static AreaEffect bombardment(Fighter owner, Fighter target) {
+        double x = target != null ? target.getX() : owner.getX();
+        return new AreaEffect(Kind.EXPLOSION, owner, target,
+                owner.scaleDamage(CombatConstants.SPECIAL_DAMAGE_BOMBARDMENT), false,
+                0.30, 0.52, x, 0, 1, x, x);
+    }
+
+    public static AreaEffect conquistadorCharge(Fighter owner, double targetX) {
+        double end = clamp(targetX, CombatConstants.MIN_X, CombatConstants.MAX_X);
+        return new AreaEffect(Kind.FLAG_DASH, owner, null,
+                owner.scaleDamage(CombatConstants.SPECIAL_DAMAGE_CONQUISTADOR_CHARGE),
+                false, 0, 0.36, end, 0, end >= owner.getX() ? 1 : -1,
+                owner.getX(), end);
     }
 
     private double liveX() {
@@ -228,6 +265,10 @@ public final class AreaEffect {
     }
 
     private void drawFlagDash(GraphicsContext gc) {
+        if ("boss_magellan".equals(owner.getSpriteId())) {
+            drawConquistadorCharge(gc);
+            return;
+        }
         Color accent = Color.web(owner.getHero().accentColor());
         double x = owner.getX();
         double y = owner.getY();
@@ -260,6 +301,54 @@ public final class AreaEffect {
                     x - direction * 40 + Math.cos(angle) * 12,
                     y - 117 + Math.sin(angle) * 12);
         }
+    }
+
+    private void drawConquistadorCharge(GraphicsContext gc) {
+        double x = owner.getX();
+        double y = owner.getY();
+        double progress = Math.min(1, elapsed / duration);
+        double fade = Math.max(0, 1 - progress);
+        double dir = direction;
+
+        gc.setStroke(alpha(Color.web("#8a939e"), 0.55 * fade));
+        gc.setLineWidth(3);
+        for (int i = 0; i < 5; i++) {
+            double off = 24 + i * 16;
+            gc.strokeLine(x - dir * off, y - 148 + i * 22,
+                    x - dir * (off + 42), y - 150 + i * 22);
+        }
+
+        gc.setFill(alpha(Color.web("#a3171b"), 0.55 * fade));
+        gc.fillPolygon(
+                new double[]{x - dir * 16, x - dir * 16,
+                        x - dir * 86, x - dir * 78},
+                new double[]{y - 140, y - 92, y - 86, y - 132}, 4);
+
+        gc.setStroke(alpha(Color.web("#e8edf4"), 0.95));
+        gc.setLineWidth(7);
+        gc.strokeArc(x + dir * 18, y - 138, 96, 90,
+                dir > 0 ? -58 : 148, dir > 0 ? 116 : -116, ArcType.OPEN);
+        gc.setStroke(alpha(Color.web("#fff6c8"), 0.85));
+        gc.setLineWidth(2.5);
+        gc.strokeArc(x + dir * 26, y - 130, 76, 72,
+                dir > 0 ? -52 : 142, dir > 0 ? 104 : -104, ArcType.OPEN);
+
+        gc.setFill(alpha(Color.web("#5b463a"), 0.45 * fade));
+        for (int i = 0; i < 6; i++) {
+            double s = rnd(i, 61);
+            double px = x - dir * (30 + s * 90);
+            double py = y - 6 - s * 14;
+            gc.fillOval(px, py, 8 + s * 10, 5 + s * 6);
+        }
+
+        if (special) {
+            BloodFX.splatter(gc, x, y - 90, progress, 0.9, dir, y);
+        }
+
+        gc.setFill(alpha(Color.web("#f4c542"), fade));
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 26));
+        gc.fillText("MACTAN!", x - dir * 40, y - 190);
     }
 
     private void drawGiantBook(GraphicsContext gc) {
@@ -357,20 +446,9 @@ public final class AreaEffect {
     private void drawBookImpact(GraphicsContext gc, double x, double landY,
                                 double feetY, double t, Color accent, Color primary,
                                 double fade) {
-        double flash = Math.max(0, 1 - t / 0.12);
-        if (flash > 0) {
-            gc.setFill(alpha(Color.WHITE, 0.85 * flash));
-            gc.fillOval(x - 260, landY - 220, 520, 440);
+        if (special) {
+            BloodFX.splatter(gc, x, landY, t, 1.0, direction, feetY);
         }
-
-        double ring = 40 + t * 520;
-        gc.setStroke(alpha(accent, 0.55 * fade));
-        gc.setLineWidth(5);
-        gc.strokeOval(x - ring, feetY - ring * 0.36, ring * 2, ring * 0.72);
-        gc.setStroke(alpha(Color.WHITE, 0.45 * fade));
-        gc.setLineWidth(2);
-        gc.strokeOval(x - ring * 0.7, feetY - ring * 0.26,
-                ring * 1.4, ring * 0.52);
 
         for (int i = 0; i < 16; i++) {
             double s = rnd(i, 11);
@@ -544,13 +622,33 @@ public final class AreaEffect {
             gc.fillOval(px, py, size, size);
         }
 
+        if (special) {
+            BloodFX.ringSpray(gc, targetX, CombatConstants.GROUND_Y - 60,
+                    radius, progress, alpha);
+            BloodFX.splatter(gc, targetX, CombatConstants.GROUND_Y - 70,
+                    progress, 0.6 * alpha, 1, CombatConstants.GROUND_Y);
+        }
+
         gc.setFill(alpha(Color.web("#f4c542"), alpha));
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 30));
-        gc.fillText("SIGAW!", targetX, CombatConstants.GROUND_Y - radius - 24);
+        gc.fillText("WAR CRY!", targetX, CombatConstants.GROUND_Y - radius - 24);
     }
 
     private void drawExplosion(GraphicsContext gc) {
+        String spriteId = owner.getSpriteId();
+        if ("boss_makapagal".equals(spriteId)) {
+            drawVolleyShot(gc);
+            return;
+        }
+        if ("boss_janolino".equals(spriteId)) {
+            drawAmbushSlash(gc);
+            return;
+        }
+        if ("boss_macarthur".equals(spriteId)) {
+            drawBombardment(gc);
+            return;
+        }
         double x = liveX();
         if (elapsed < delay) {
             double fall = clamp01(elapsed / delay);
@@ -611,6 +709,155 @@ public final class AreaEffect {
                     x + Math.cos(a) * radius * 1.9,
                     CombatConstants.GROUND_Y - radius * 0.5 + Math.sin(a) * radius * 0.95);
         }
+
+        if (special) {
+            BloodFX.splatter(gc, x, CombatConstants.GROUND_Y - 40, progress,
+                    0.95, 1, CombatConstants.GROUND_Y);
+        }
+    }
+
+    private void drawVolleyShot(GraphicsContext gc) {
+        double x = liveX();
+        double y = CombatConstants.GROUND_Y - 112;
+        double dir = x >= owner.getX() ? 1 : -1;
+
+        if (elapsed < delay) {
+            double charge = Math.max(0, Math.min(1, elapsed / delay));
+            gc.setFill(alpha(Color.web("#f4c542"), 0.5 * charge));
+            gc.fillOval(x - 10, y - 10, 20, 20);
+            return;
+        }
+
+        double progress = Math.min(1, (elapsed - delay) / duration);
+        double fade = Math.max(0, 1 - progress);
+        double sx = owner.getX() + dir * 34;
+
+        gc.setStroke(alpha(Color.web("#fff2b0"), 0.9 * fade));
+        gc.setLineWidth(3);
+        gc.strokeLine(sx, y, x - dir * 12, y);
+        gc.setStroke(alpha(Color.web("#e74c3c"), 0.35 * fade));
+        gc.setLineWidth(7);
+        gc.strokeLine(sx, y, x - dir * 12, y);
+        gc.setFill(alpha(Color.web("#fff8d6"), fade));
+        gc.fillOval(x - dir * 14 - 9, y - 11, 22, 22);
+
+        for (int i = 0; i < 5; i++) {
+            double s = rnd(i, 71);
+            double px = x - dir * (8 + s * 42) * progress;
+            double py = y - 20 + rnd(i, 72) * 38;
+            gc.setFill(alpha(Color.web("#e8e0d0"), 0.4 * fade));
+            gc.fillOval(px, py, 7 + s * 10, 7 + s * 10);
+        }
+
+        if (special) {
+            BloodFX.splatter(gc, x, y, progress, 0.9, dir,
+                    CombatConstants.GROUND_Y);
+        }
+    }
+
+    private void drawAmbushSlash(GraphicsContext gc) {
+        double x = liveX();
+        double feetY = CombatConstants.GROUND_Y;
+        if (elapsed < delay) {
+            double charge = Math.max(0, Math.min(1, elapsed / delay));
+            gc.setStroke(alpha(Color.web("#e74c3c"), 0.6 * charge));
+            gc.setLineWidth(2);
+            gc.strokeOval(x - 26, feetY - 126, 52, 104);
+            return;
+        }
+
+        double progress = Math.min(1, (elapsed - delay) / duration);
+        double fade = Math.max(0, 1 - progress);
+        double dir = direction;
+
+        gc.setStroke(alpha(Color.web("#7a1a1a"), 0.35 * fade));
+        gc.setLineWidth(14);
+        gc.strokeArc(x - 46, feetY - 146, 102, 112,
+                dir > 0 ? -72 : 108, dir > 0 ? 144 : -144, ArcType.OPEN);
+        gc.setStroke(alpha(Color.web("#ff8a7a"), 0.95 * fade));
+        gc.setLineWidth(5);
+        gc.strokeArc(x - 40, feetY - 140, 92, 100,
+                dir > 0 ? -68 : 104, dir > 0 ? 136 : -136, ArcType.OPEN);
+        gc.setStroke(alpha(Color.web("#f5f0e1"), 0.8 * fade));
+        gc.setLineWidth(2);
+        gc.strokeArc(x - 32, feetY - 132, 76, 84,
+                dir > 0 ? -60 : 96, dir > 0 ? 120 : -120, ArcType.OPEN);
+
+        if (special) {
+            BloodFX.splatter(gc, x, feetY - 92, progress, 0.95, dir, feetY);
+        }
+    }
+
+    private void drawBombardment(GraphicsContext gc) {
+        double x = liveX();
+        if (elapsed < delay) {
+            double fall = clamp01(elapsed / delay);
+            double sy = -60 + (CombatConstants.GROUND_Y + 60) * fall;
+            gc.setStroke(alpha(Color.web("#dce9ff"), 0.5 * fall));
+            gc.setLineWidth(2);
+            gc.strokeLine(x, Math.max(-30, sy - 80), x, sy);
+            gc.setFill(alpha(Color.web("#2b2b22"), 0.9));
+            gc.save();
+            gc.translate(x, sy);
+            gc.rotate(0.35);
+            gc.fillRoundRect(-6, -16, 12, 30, 4, 4);
+            gc.setFill(alpha(Color.web("#8fc2ff"), 0.85 * fall));
+            gc.fillRect(-3, -10, 6, 18);
+            gc.restore();
+            gc.setFill(alpha(Color.web("#dce9ff"), 0.35 * fall));
+            gc.fillOval(x - 30, CombatConstants.GROUND_Y - 10, 60, 16);
+            return;
+        }
+
+        double progress = Math.min(1, (elapsed - delay) / duration);
+        double fade = Math.max(0, 1 - progress);
+        double radius = 40 + progress * 130;
+
+        gc.setFill(new RadialGradient(0, 0, x, CombatConstants.GROUND_Y - 24,
+                radius * 2, false, CycleMethod.NO_CYCLE,
+                new Stop(0, alpha(Color.web("#ffffff"), 0.9 * fade)),
+                new Stop(0.30, alpha(Color.web("#ffd27a"), 0.85 * fade)),
+                new Stop(0.62, alpha(Color.web("#6b6b4a"), 0.55 * fade)),
+                new Stop(1, alpha(Color.web("#3a3a2a"), 0))));
+        gc.fillOval(x - radius * 2, CombatConstants.GROUND_Y - radius * 2,
+                radius * 4, radius * 3.4);
+
+        gc.setStroke(alpha(Color.WHITE, 0.8 * fade));
+        gc.setLineWidth(4);
+        gc.strokeOval(x - radius * 1.8, CombatConstants.GROUND_Y - radius * 0.9,
+                radius * 3.6, radius * 1.8);
+        gc.setStroke(alpha(Color.web("#dce9ff"), 0.6 * fade));
+        gc.setLineWidth(2);
+        for (int i = 0; i < 10; i++) {
+            double a = i * Math.PI / 5 + progress;
+            gc.strokeLine(x + Math.cos(a) * radius,
+                    CombatConstants.GROUND_Y - radius * 0.5 + Math.sin(a) * radius * 0.5,
+                    x + Math.cos(a) * radius * 2,
+                    CombatConstants.GROUND_Y - radius * 0.5 + Math.sin(a) * radius * 1.05);
+        }
+
+        for (int i = 0; i < 12; i++) {
+            double s = rnd(i, 91);
+            double a = rnd(i, 92) * Math.PI * 2;
+            double dist = radius * (0.5 + s * 0.9);
+            double px = x + Math.cos(a) * dist;
+            double py = CombatConstants.GROUND_Y - radius * 0.6
+                    + Math.sin(a) * dist * 0.5;
+            double size = 8 + s * 20;
+            gc.setFill(alpha(mix(Color.web("#6b6b4a"), Color.web("#2a2a20"), s),
+                    0.6 * fade));
+            gc.fillOval(px, py, size, size);
+        }
+
+        if (special) {
+            BloodFX.splatter(gc, x, CombatConstants.GROUND_Y - 45, progress,
+                    1.0, 1, CombatConstants.GROUND_Y);
+        }
+
+        gc.setFill(alpha(Color.web("#f4c542"), fade));
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 30));
+        gc.fillText("EXILE!", x, CombatConstants.GROUND_Y - 210);
     }
 
     private void drawLightBeam(GraphicsContext gc) {
@@ -646,6 +893,13 @@ public final class AreaEffect {
             double py = y - 30 + rnd(i, 42) * 80;
             gc.setFill(alpha(mix(accent, Color.WHITE, s), 0.7 * alpha));
             gc.fillOval(px, py, 2 + s * 4, 2 + s * 4);
+        }
+
+        if (special && target != null && target.isAlive()) {
+            double tx = target.getX();
+            double ty = target.getY() - target.getCurrentHeight() * 0.55;
+            BloodFX.splatter(gc, tx, ty, progress, 0.95, direction,
+                    CombatConstants.GROUND_Y);
         }
 
         gc.setFill(alpha(Color.web("#2b1b12"), alpha));
@@ -702,10 +956,20 @@ public final class AreaEffect {
             gc.fillOval(px, py, 8 + s * 16, 8 + s * 16);
         }
 
+        if (special && target != null && target.isAlive()) {
+            double tx = target.getX();
+            double ty = target.getY() - target.getCurrentHeight() * 0.62;
+            BloodFX.splatter(gc, tx, ty, progress, 1.0, direction,
+                    CombatConstants.GROUND_Y);
+        }
+
         gc.setFill(alpha(Color.web("#f4c542"), alpha));
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 30));
-        gc.fillText("SENTENCIA!", targetX + direction * 130, y - 90);
+        String shout = "boss_polavieja".equals(owner.getSpriteId())
+                ? "FIRE!"
+                : "JUDGMENT!";
+        gc.fillText(shout, targetX + direction * 130, y - 90);
     }
 
     private double combatGround() {
@@ -714,6 +978,14 @@ public final class AreaEffect {
 
     public boolean isHigh() {
         return high;
+    }
+
+    public void markSpecial() {
+        special = true;
+    }
+
+    public boolean isSpecial() {
+        return special;
     }
 
     public boolean isAlive() {

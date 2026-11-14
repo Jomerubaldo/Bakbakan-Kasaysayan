@@ -1,33 +1,44 @@
 # Bakbakan-Kasaysayan — Game Spec
 
 1. OVERVIEW
-- Single player 1v1 fighting game vs CPU. Theme: Philippine national heroes. 5 rounds. Cartoon, family-friendly: no blood, no gore. Respectful portrayal of heroes.
+- Single player 1v1 fighting game vs CPU. Theme: Philippine national heroes. 5 rounds. Cartoon, family-friendly: no dismemberment or gore; damage and R specials use stylized blood splatter with droplets, streaks, and ground stains. Respectful portrayal of heroes.
+- All in-game text, labels, cinematics, and result messages are in standard English.
 - Window 1280x720, Canvas-based rendering, AnimationTimer game loop with delta time (cap dt at 0.05s).
 
 2. SCREENS / FLOW
-Loading -> Main Menu (Play, Quit) -> Hero Select (5 heroes, stats preview, mouse + keyboard) -> Fight -> (Pause overlay) -> Round Win screen ("You Win! Congratulations!" then Next Round) / Game Over screen ("You Lose! Better luck next time." with Continue = restart from Round 1, and Main Menu) / Final Victory screen after beating Round 5 ("Congrats! You finally defeated the boss!").
+Loading -> Main Menu (Play, Quit) -> Hero Select (5 heroes, stats preview, mouse + keyboard) -> Fight -> (Pause overlay) -> Round Win screen ("You Win! Round cleared! Keep the streak alive." then Next Round) / Game Over screen ("You Lose! They got you this time. Get up and run it back!" with Continue = restart from Round 1, and Main Menu) / Final Victory screen after beating Round 5 ("Victory! Boss defeated! Your hero's legend is complete.").
 
 3. CONTROLS
-A/D move, W jump, S duck (hold), J basic attack, K skill (costs mana), L block (hold), E special (needs full special bar), Esc or P pause/resume, Enter/mouse for menus.
+A/D move, Space jump, S duck (hold), J basic attack, K skill (costs mana), L block (hold), R special (needs full special bar), Esc or P pause/resume, Enter/mouse for menus.
 
 4. RULES
 - Health 100 for both fighters, reset every round. Mana max 100, regenerates automatically every second; skill (K) costs mana and is blocked if mana is insufficient.
-- Special bar 0-100: fills when dealing and receiving damage. At 100 show "SPECIAL READY"; pressing E uses the hero's special and resets the bar to 0.
+- Special bar 0-100: fills when dealing and receiving damage. At 100 show "SPECIAL READY"; pressing R uses the hero's special and resets the bar to 0.
 - Block reduces melee damage by 70%. Ducking avoids high projectiles.
 - Round timer 1:00. On timeout the fighter with higher health wins; a tie counts as a loss for the player.
-- Rounds 1-2: Spanish colonial soldiers (Scout, Guard). Rounds 3-4: American colonial soldiers (Rifleman, Sergeant). Difficulty rises each round. Round 5: final boss "El Verdugo" with higher health/damage. A warning/story cinematic plays before Round 5 and tells the true fate of the five heroes, highlighting the chosen hero. It has no timer and no skip; the player advances each slide with Enter only.
-- Losing to the final boss shows a short hero-specific legacy message on the Game Over screen (e.g., the hero's story lives on in the hearts of Filipinos and future generations).
+- Rounds 1-2: Spanish colonial soldiers (Scout, Guard). Rounds 3-4: American colonial soldiers (Rifleman, Sergeant). Difficulty rises each round. Round 5: a hero-specific historical final boss with higher health/damage. A warning/story cinematic plays before Round 5 and tells the true fate of the five heroes, highlighting the chosen hero. It has no timer and no skip; the player advances each slide with Enter only.
+- Losing to the final boss shows a short hero-specific English legacy message on the Game Over screen (e.g., Rizal's words live on in every generation).
 - Player loses any round -> Game Over -> Continue restarts from Round 1 (even if lost in round 2 or 3).
 - Player wins rounds 1-4 -> "You Win" screen -> next round. Wins round 5 -> Final Victory screen.
 
 5. HEROES (each has different speed, damage, range, defense, mana regen)
-- Jose Rizal: ranged. J throws a book (projectile). K ink splash. E giant "Noli Me Tangere" book slams down for big damage.
-- Andres Bonifacio: fast, short range. J bolo slash. K Katipunan flag dash. E "Sigaw ng Pugad Lawin" battle-cry shockwave.
-- Antonio Luna: strong, slower. J sword slash. K rifle shot. E artillery barrage (multi-hit).
-- Apolinario Mabini: tactical, fastest mana regen. J cane strike. K quill throw. E "Decalogue" scroll light beam.
-- Lapulapu: heavy defender. J kampilan slash. K kampilan wave. E "Mactan tidal strike" wave.
-FINAL BOSS (put in one easy-to-edit BossData config; use a fictional archetype, not a real named person):
-- "El Verdugo" — a fictional executioner/conqueror who embodies the forces behind the heroes' deaths. Per-hero descriptions reference the true historical circumstances: Rizal (firing squad at Bagumbayan), Bonifacio (Council of War execution), Luna (Presidential Guard at Cabanatuan), Mabini (American exile, died of cholera), Lapulapu (victory at Mactan; death unknown).
+- Jose Rizal: ranged. J throws a book (projectile). K ink splash. R giant "Noli Me Tangere" book slams down for big damage.
+- Andres Bonifacio: fast, short range. J bolo slash. K Katipunan flag dash. R "Sigaw ng Pugad Lawin" battle-cry shockwave.
+- Antonio Luna: strong, slower. J sword slash. K rifle shot. R artillery barrage (multi-hit).
+- Apolinario Mabini: tactical, fastest mana regen. J cane strike. K quill throw. R "Decalogue" scroll light beam.
+- Lapulapu: heavy defender. J kampilan slash. K kampilan wave. R "Mactan tidal strike" wave.
+FINAL BOSS (put in one easy-to-edit BossData config; historically accurate per selected hero):
+- Jose Rizal -> Governor-General Camilo de Polavieja, who approved the death sentence carried out by firing squad at Bagumbayan.
+- Andres Bonifacio -> Mayor Lazaro Makapagal, who led the execution squad at Maragondon under the Council of War.
+- Antonio Luna -> Captain Pedro Janolino of the Presidential Guard at Cabanatuan.
+- Apolinario Mabini -> General Arthur MacArthur, whose military government exiled Mabini to Guam; Mabini died of cholera, not by weapon.
+- Lapulapu -> Ferdinand Magellan, defeated at Mactan. Lapulapu's own death is unrecorded, so Magellan serves as his historical nemesis.
+- Each boss keeps the shared "final_boss" melee moveset and AI logic but uses a distinct procedural costume, headgear, weapon, skill, and special:
+  - Polavieja: K "Saber Command" (gold command wave); R "Bagumbayan Firing Squad" (long-range volley).
+  - Makapagal: K "Bolo Strike" (short bolo wave); R "Maragondon Volley" (three staggered rifle hits).
+  - Janolino: K "Guard Rifle Burst" (three-shot burst); R "Cabanatuan Ambush" (three close-range sword slashes).
+  - MacArthur: K "Heavy Rifle" (slow blue tracer); R "Colonial Bombardment" (single heavy shell).
+  - Magellan: K "Arquebus" (slow heavy shot); R "Mactan Charge" (armored sword dash).
 
 6. ASSETS
 - No copyrighted material (no Street Fighter music or sprites).
