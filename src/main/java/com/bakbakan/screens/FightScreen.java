@@ -16,6 +16,7 @@ import com.bakbakan.events.GameEventBus;
 import com.bakbakan.events.GameOverEvent;
 import com.bakbakan.events.HitEvent;
 import com.bakbakan.events.PauseEvent;
+import com.bakbakan.events.PlayerHeroDownEvent;
 import com.bakbakan.events.ResumeEvent;
 import com.bakbakan.events.RoundEndEvent;
 import com.bakbakan.events.ScreenChangeEvent;
@@ -27,6 +28,7 @@ import com.bakbakan.ui.FinalWarningCinematic;
 import com.bakbakan.ui.Hud;
 import com.bakbakan.ui.ImpactCamera;
 import com.bakbakan.ui.SpecialCinematic;
+import com.bakbakan.ui.SwapEntrance;
 import com.bakbakan.util.GameConfig;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -72,6 +74,7 @@ public class FightScreen implements Screen {
     private final SkillSystem skills;
     private final InputHandler input = new InputHandler();
     private final SpecialCinematic cinematic = new SpecialCinematic();
+    private final SwapEntrance swapEntrance = new SwapEntrance();
     private final FinalWarningCinematic finalWarning = new FinalWarningCinematic();
     private final ImpactCamera impactCamera = new ImpactCamera();
     private final StackPane root;
@@ -87,8 +90,11 @@ public class FightScreen implements Screen {
     private final EventHandler<PauseEvent> pauseHandler = this::onPause;
     private final EventHandler<ResumeEvent> resumeHandler = this::onResume;
     private final EventHandler<HitEvent> hitHandler = this::onHit;
+    private final EventHandler<PlayerHeroDownEvent> heroDownHandler = this::onPlayerHeroDown;
     private final List<BloodParticle> bloodParticles = new ArrayList<>();
+    private final List<HeroData> swapHeroes = new ArrayList<>();
     private final Random bloodRandom = new Random();
+    private final Random swapRandom = new Random();
 
     private Fighter player;
     private Fighter opponent;
@@ -107,8 +113,13 @@ public class FightScreen implements Screen {
     private boolean resultHandlersAttached;
     private boolean pauseHandlersAttached;
     private boolean hitHandlerAttached;
+    private boolean heroDownHandlerAttached;
     private boolean paused;
     private int pauseSelection;
+    private int swapFlashSlot = -1;
+    private double swapFlashTimer;
+    private double swapCooldown;
+    private double swapWaitTimer;
 
     public FightScreen(GameEventBus bus, GameSession session, AssetManager assets) {
         this.bus = bus;
@@ -194,13 +205,17 @@ public class FightScreen implements Screen {
 
     @Override
     public void onShow() {
-        HeroData hero = session.hasSelectedHero()
+        HeroData runHero = session.hasSelectedHero()
                 ? session.getSelectedHero()
                 : HeroData.ALL.get(0);
+        HeroData activeHero = session.getActiveHero();
+        if (activeHero == null) {
+            activeHero = runHero;
+        }
         int round = session.getCurrentRound();
-        enemyData = EnemyData.forRound(round, hero);
+        enemyData = EnemyData.forRound(round, runHero);
 
-        player = new Fighter(PLAYER_ID, hero, 380, true, bus);
+        player = new Fighter(PLAYER_ID, activeHero, 380, true, bus);
         opponent = new Fighter(OPPONENT_ID, enemyData.moveset(), 900, false, bus,
                 enemyData.maxHealth(), enemyData.damageMultiplier());
         opponent.setSpriteId(enemyData.spriteId());
@@ -212,9 +227,23 @@ public class FightScreen implements Screen {
         if (hud != null) {
             hud.detach(bus);
         }
-        hud = new Hud(PLAYER_ID, OPPONENT_ID, hero.name(), enemyData.name(),
+        hud = new Hud(PLAYER_ID, OPPONENT_ID, activeHero.name(), enemyData.name(),
                 CombatConstants.MAX_HEALTH, enemyData.maxHealth(), enemyData.boss());
         hud.attach(bus);
+
+        swapHeroes.clear();
+        if (session.hasSwapHeroes()) {
+            swapHeroes.addAll(session.getSwapHeroes());
+        } else {
+            for (int i = 0; i < 3 && i < HeroData.ALL.size(); i++) {
+                swapHeroes.add(HeroData.ALL.get(i));
+            }
+            session.setSwapHeroes(new ArrayList<>(swapHeroes));
+        }
+        swapFlashSlot = -1;
+        swapFlashTimer = 0;
+        swapCooldown = 0;
+        swapWaitTimer = 0;
 
         skills.clear();
         bloodParticles.clear();
@@ -222,6 +251,7 @@ public class FightScreen implements Screen {
         paused = false;
         pauseSelection = 0;
         cinematic.stop();
+        swapEntrance.stop();
         finalWarning.stop();
         impactCamera.stop();
         pauseOverlay.setVisible(false);
@@ -229,13 +259,14 @@ public class FightScreen implements Screen {
         attachResultHandlers();
         attachPauseHandlers();
         attachHitHandlers();
+        attachHeroDownHandlers();
 
         roundManager = new RoundManager(bus, session);
         roundManager.attach();
         enemyAI = new EnemyAI(opponent, player, skills, round);
         roundManager.startRound(player, opponent, enemyData);
         if (round >= CombatConstants.TOTAL_ROUNDS) {
-            finalWarning.start(hero, enemyData.moveset(), enemyData.spriteId());
+            finalWarning.start(runHero, enemyData.moveset(), enemyData.spriteId());
         }
 
         elapsed = 0;
@@ -257,6 +288,7 @@ public class FightScreen implements Screen {
         detachPauseHandlers();
         detachResultHandlers();
         detachHitHandlers();
+        detachHeroDownHandlers();
         if (roundManager != null) {
             roundManager.detach();
             roundManager = null;
@@ -268,6 +300,7 @@ public class FightScreen implements Screen {
         bloodParticles.clear();
         input.clear();
         cinematic.stop();
+        swapEntrance.stop();
         finalWarning.stop();
         impactCamera.stop();
         enemyAI = null;
@@ -284,6 +317,9 @@ public class FightScreen implements Screen {
             return;
         }
 
+        swapCooldown = Math.max(0, swapCooldown - dt);
+        swapWaitTimer = Math.max(0, swapWaitTimer - dt);
+
         cinematic.update(dt);
         if (cinematic.isActive()) {
             input.endFrame();
@@ -296,6 +332,12 @@ public class FightScreen implements Screen {
             return;
         }
 
+        if (swapEntrance.isActive()) {
+            updateSwapEntrance(dt);
+            input.endFrame();
+            return;
+        }
+
         impactCamera.update(dt);
         double worldDt = dt * impactCamera.timeScale();
 
@@ -303,6 +345,7 @@ public class FightScreen implements Screen {
         noManaTimer = Math.max(0, noManaTimer - dt);
         notReadyTimer = Math.max(0, notReadyTimer - dt);
         timeOutTimer = Math.max(0, timeOutTimer - dt);
+        swapFlashTimer = Math.max(0, swapFlashTimer - dt);
 
         if (resultScreen != null) {
             resultTimer -= dt;
@@ -449,6 +492,34 @@ public class FightScreen implements Screen {
         }
         bus.unregister(HitEvent.HIT, hitHandler);
         hitHandlerAttached = false;
+    }
+
+    private void attachHeroDownHandlers() {
+        if (heroDownHandlerAttached) {
+            return;
+        }
+        bus.register(PlayerHeroDownEvent.PLAYER_HERO_DOWN, heroDownHandler);
+        heroDownHandlerAttached = true;
+    }
+
+    private void detachHeroDownHandlers() {
+        if (!heroDownHandlerAttached) {
+            return;
+        }
+        bus.unregister(PlayerHeroDownEvent.PLAYER_HERO_DOWN, heroDownHandler);
+        heroDownHandlerAttached = false;
+    }
+
+    private void onPlayerHeroDown(PlayerHeroDownEvent event) {
+        if (player == null || swapEntrance.isActive() || resultScreen != null) {
+            return;
+        }
+        List<HeroData> living = session.getLivingSwapHeroes(player.getHero().id());
+        if (living.isEmpty()) {
+            return;
+        }
+        HeroData next = living.get(swapRandom.nextInt(living.size()));
+        beginSwap(next);
     }
 
     private void onPause(PauseEvent event) {
@@ -690,9 +761,15 @@ public class FightScreen implements Screen {
 
         if (player != null && opponent != null) {
             drawShadow(gc, opponent);
-            drawShadow(gc, player);
+            if (!swapEntrance.isActive()) {
+                drawShadow(gc, player);
+            }
             sprites.render(gc, opponent, elapsed);
-            sprites.render(gc, player, elapsed);
+            if (swapEntrance.isActive()) {
+                swapEntrance.render(gc, sprites);
+            } else {
+                sprites.render(gc, player, elapsed);
+            }
             skills.render(gc);
             renderBlood(gc);
         }
@@ -706,13 +783,15 @@ public class FightScreen implements Screen {
             hud.render(gc);
         }
 
+        drawSwapPanel(gc);
         drawFightBanner(gc);
         drawCombatFeedback(gc);
+        swapEntrance.renderOverlay(gc);
 
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setFill(Color.web("#c7d0e8"));
         gc.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 13));
-        gc.fillText("A/D Move   SPACE Jump   S Duck   J Attack   K Skill   L Block   R Special   Esc/P Pause",
+        gc.fillText("A/D Move   SPACE Jump   S Duck   J Attack   K Skill   L Block   R Special   TAB Random Swap (5s CD)   Esc/P Pause",
                 GameConfig.WIDTH / 2.0, 712);
 
         drawButton(gc, BACK_X, BACK_Y, "Change Hero", backHovered);
@@ -1146,6 +1225,168 @@ public class FightScreen implements Screen {
                 16 * scale);
     }
 
+    private void drawSwapPanel(GraphicsContext gc) {
+        if (player == null || swapHeroes.isEmpty()
+                || cinematic.isActive() || finalWarning.isActive()
+                || swapEntrance.isActive()) {
+            return;
+        }
+        double slotW = 112;
+        double gap = 6;
+        double totalW = 64 + swapHeroes.size() * (slotW + gap) - gap;
+        double x = (GameConfig.WIDTH - totalW) / 2.0;
+        double y = 140;
+        double h = 38;
+        boolean cooling = swapCooldown > 0;
+
+        gc.setFill(Color.web("#0a0f1e", 0.74));
+        gc.fillRoundRect(x, y, totalW, h, 12, 12);
+        gc.setStroke(cooling ? Color.web("#f4c542", 0.75)
+                : Color.web("#34405f"));
+        gc.setLineWidth(1.5);
+        gc.strokeRoundRect(x, y, totalW, h, 12, 12);
+
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.setFill(cooling ? Color.web("#f4c542") : Color.web("#9aa4c0"));
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
+        gc.fillText(cooling
+                ? Math.max(1, (int) Math.ceil(swapCooldown)) + "s"
+                : "TAB", x + 30, y + 24);
+
+        for (int i = 0; i < swapHeroes.size(); i++) {
+            HeroData hero = swapHeroes.get(i);
+            double slotX = x + 58 + i * (slotW + gap);
+            boolean active = hero.id().equals(player.getHero().id());
+            boolean fallen = !active && session.getHeroHealth(hero.id()) <= 0;
+            boolean flash = !fallen && i == swapFlashSlot && swapFlashTimer > 0;
+            Color accent = Color.web(hero.accentColor());
+
+            gc.setFill(active
+                    ? new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 0.34)
+                    : fallen ? Color.web("#241013")
+                    : flash ? Color.web("#f4c542", 0.28) : Color.web("#141d33"));
+            gc.fillRoundRect(slotX, y + 5, slotW, h - 10, 8, 8);
+            gc.setStroke(active ? accent : fallen ? Color.web("#7a2f2f")
+                    : flash ? Color.web("#ffe89a") : Color.web("#2a3350"));
+            gc.setLineWidth(active || flash ? 2 : 1);
+            gc.strokeRoundRect(slotX, y + 5, slotW, h - 10, 8, 8);
+
+            gc.setFill(active ? Color.web("#ffffff")
+                    : fallen ? Color.web("#8a5a5a") : Color.web("#d7def0"));
+            gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
+            gc.fillText(shortHeroName(hero) + (fallen ? " K.O." : ""),
+                    slotX + slotW / 2.0, y + 24);
+        }
+
+        if (cooling) {
+            double progress = Math.max(0, 1
+                    - swapCooldown / CombatConstants.SWAP_COOLDOWN_SECONDS);
+            gc.setFill(Color.web("#f4c542", 0.8));
+            gc.fillRect(x + 10, y + h - 5, (totalW - 20) * progress, 2.5);
+        }
+    }
+
+    private static String shortHeroName(HeroData hero) {
+        String name = hero.name();
+        int space = name.lastIndexOf(' ');
+        return space >= 0 ? name.substring(space + 1) : name;
+    }
+
+    private void tryRandomSwap() {
+        if (player == null || swapHeroes.isEmpty()) {
+            return;
+        }
+        if (swapCooldown > 0) {
+            swapWaitTimer = 0.9;
+            bus.fire(new SoundRequestEvent("no_mana", false));
+            return;
+        }
+        List<Integer> candidates = new ArrayList<>();
+        for (int i = 0; i < swapHeroes.size(); i++) {
+            HeroData hero = swapHeroes.get(i);
+            if (!hero.id().equals(player.getHero().id())
+                    && session.getHeroHealth(hero.id()) > 0) {
+                candidates.add(i);
+            }
+        }
+        if (candidates.isEmpty()) {
+            return;
+        }
+        int slot = candidates.get(swapRandom.nextInt(candidates.size()));
+        trySwap(slot);
+    }
+
+    private void trySwap(int slot) {
+        if (player == null || slot < 0 || slot >= swapHeroes.size()
+                || resultScreen != null || roundManager == null
+                || !roundManager.isRunning()) {
+            return;
+        }
+        if (swapCooldown > 0) {
+            swapWaitTimer = 0.9;
+            bus.fire(new SoundRequestEvent("no_mana", false));
+            return;
+        }
+        HeroData next = swapHeroes.get(slot);
+        if (next.id().equals(player.getHero().id())) {
+            swapFlashSlot = slot;
+            swapFlashTimer = 0.9;
+            return;
+        }
+        if (session.getHeroHealth(next.id()) <= 0 || !player.canSwapHero()) {
+            swapFlashSlot = slot;
+            swapFlashTimer = 0.55;
+            return;
+        }
+        beginSwap(next);
+    }
+
+    private void beginSwap(HeroData next) {
+        if (player == null || next == null) {
+            return;
+        }
+        boolean enemyRight = opponent.getX() >= player.getX();
+        double side = enemyRight ? 1 : -1;
+        double startX = clampX(player.getX() - side * 50);
+        double startY = -160;
+        double contactX = clampX(opponent.getX() - side * 70);
+        double contactY = opponent.getY() - 95;
+        double landX = clampX(player.getX());
+        Fighter ghost = new Fighter(PLAYER_ID + "_swap", next,
+                startX, true, bus);
+        ghost.setPosition(startX, startY);
+        session.storeHeroResources(player.getHero().id(),
+                player.getHealth(), player.getMana(), player.getSpecial());
+        double nextHealth = session.getHeroHealth(next.id());
+        double nextMana = session.getHeroMana(next.id());
+        double nextSpecial = session.getHeroSpecial(next.id());
+        player.swapHero(next, nextHealth, nextMana, nextSpecial);
+        session.setActiveHero(next);
+        swapCooldown = CombatConstants.SWAP_COOLDOWN_SECONDS;
+        swapWaitTimer = 0;
+        if (hud != null) {
+            hud.setPlayerName(next.name());
+        }
+        swapEntrance.start(next, ghost, startX, startY, contactX,
+                contactY, landX, enemyRight);
+        swapFlashSlot = swapHeroes.indexOf(next);
+        swapFlashTimer = 1.0;
+        bus.fire(new SoundRequestEvent("ui_click", false));
+    }
+
+    private void updateSwapEntrance(double dt) {
+        swapEntrance.update(dt);
+        if (swapEntrance.consumeImpact() && player != null && opponent != null
+                && opponent.isAlive()) {
+            combat.applyHit(player, opponent, 10.0 * player.getDamageMultiplier(),
+                    false, false);
+        }
+        if (swapEntrance.isComplete()) {
+            player.setPosition(swapEntrance.getLandX(), CombatConstants.GROUND_Y);
+            swapEntrance.stop();
+        }
+    }
+
     private void drawFightBanner(GraphicsContext gc) {
         if (enemyData != null && enemyData.boss()) {
             drawBossBanner(gc);
@@ -1214,6 +1455,12 @@ public class FightScreen implements Screen {
             drawFloatingText(gc, "SPECIAL NOT READY", player.getX(),
                     player.getY() - 214, notReadyTimer, Color.web("#f4c542"));
         }
+        if (swapWaitTimer > 0) {
+            drawFloatingText(gc, "SWAP COOLDOWN "
+                    + Math.max(1, (int) Math.ceil(swapCooldown)) + "s",
+                    player.getX(), player.getY() - 238, swapWaitTimer,
+                    Color.web("#f4c542"));
+        }
     }
 
     private void drawFloatingText(GraphicsContext gc, String text, double x, double y,
@@ -1258,6 +1505,10 @@ public class FightScreen implements Screen {
             event.consume();
             return;
         }
+        if (swapEntrance.isActive()) {
+            event.consume();
+            return;
+        }
         if (code == KeyCode.ESCAPE || code == KeyCode.P) {
             togglePause();
             event.consume();
@@ -1274,6 +1525,11 @@ public class FightScreen implements Screen {
             event.consume();
             return;
         }
+        if (code == KeyCode.TAB) {
+            tryRandomSwap();
+            event.consume();
+            return;
+        }
         input.keyPressed(code);
     }
 
@@ -1286,7 +1542,8 @@ public class FightScreen implements Screen {
 
     @Override
     public void onMouseMoved(MouseEvent event) {
-        if (paused || cinematic.isActive() || finalWarning.isActive()) {
+        if (paused || cinematic.isActive() || finalWarning.isActive()
+                || swapEntrance.isActive()) {
             return;
         }
         backHovered = inside(event.getX(), event.getY(), BACK_X, BACK_Y);
@@ -1295,7 +1552,8 @@ public class FightScreen implements Screen {
 
     @Override
     public void onMouseClicked(MouseEvent event) {
-        if (paused || cinematic.isActive() || finalWarning.isActive()) {
+        if (paused || cinematic.isActive() || finalWarning.isActive()
+                || swapEntrance.isActive()) {
             return;
         }
         if (inside(event.getX(), event.getY(), BACK_X, BACK_Y)) {

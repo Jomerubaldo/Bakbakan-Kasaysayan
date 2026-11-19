@@ -47,9 +47,10 @@ public final class CombatSystem {
             return;
         }
 
+        double afterDefense = rawDamage * defenseMultiplier(defender);
         double damage = blocked
-                ? rawDamage * (1.0 - CombatConstants.BLOCK_DAMAGE_REDUCTION)
-                : rawDamage;
+                ? afterDefense * (1.0 - CombatConstants.BLOCK_DAMAGE_REDUCTION)
+                : afterDefense;
 
         defender.receiveHit(damage, blocked, attacker.getX());
 
@@ -64,5 +65,12 @@ public final class CombatSystem {
         if (!defender.isAlive()) {
             bus.fire(new FighterDefeatedEvent(defender.getId(), attacker.getId()));
         }
+    }
+
+    private static double defenseMultiplier(Fighter defender) {
+        double defense = Math.max(0, defender.getDefense());
+        double multiplier = CombatConstants.DEFENSE_PIVOT
+                / (CombatConstants.DEFENSE_PIVOT + defense);
+        return Math.max(CombatConstants.MIN_DAMAGE_MULTIPLIER, multiplier);
     }
 }

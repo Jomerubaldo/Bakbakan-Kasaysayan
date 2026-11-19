@@ -23,6 +23,10 @@ public final class CombatConstants {
 
     public static final double BASE_ATTACK_DAMAGE = 8;
     public static final double ATTACK_DAMAGE_SCALING = 0.12;
+    public static final double SKILL_POWER_BASE = 0.8;
+    public static final double SKILL_POWER_SCALING = 0.004;
+    public static final double DEFENSE_PIVOT = 100;
+    public static final double MIN_DAMAGE_MULTIPLIER = 0.2;
     public static final double ATTACK_RANGE_BASE = 45;
     public static final double ATTACK_RANGE_SCALING = 0.75;
     public static final double ATTACK_DURATION = 0.28;
@@ -37,12 +41,13 @@ public final class CombatConstants {
     public static final double SKILL_MANA_COST = 30;
     public static final double MANA_REGEN_BASE = 4;
     public static final double MANA_REGEN_SCALING = 0.09;
-    public static final double SPECIAL_GAIN_DEALT = 1.15;
-    public static final double SPECIAL_GAIN_TAKEN = 0.9;
+    public static final double SPECIAL_GAIN_DEALT = 1.25;
+    public static final double SPECIAL_GAIN_TAKEN = 1.0;
     public static final double SKILL_CAST_LOCK = 0.35;
     public static final double SPECIAL_CAST_LOCK = 0.55;
     public static final double SKILL_COOLDOWN = 0.7;
     public static final double SPECIAL_COOLDOWN = 1.0;
+    public static final double SWAP_COOLDOWN_SECONDS = 5.0;
 
     public static final double SKILL_DAMAGE_INK = 18;
     public static final double SKILL_DAMAGE_FLAG_DASH = 20;

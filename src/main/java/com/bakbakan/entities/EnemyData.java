@@ -24,7 +24,7 @@ public record EnemyData(
             return BossData.forHero(playerHero).toEnemyData(playerHero);
         }
 
-        double multiplier = 1.0 + (clamped - 1) * 0.06;
+        double multiplier = 0.92 + (clamped - 1) * 0.07;
         return switch (clamped) {
             case 1 -> new EnemyData(
                     "Spanish Scout",

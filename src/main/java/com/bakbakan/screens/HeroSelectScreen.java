@@ -358,7 +358,7 @@ public class HeroSelectScreen implements Screen {
         HeroData hero = HeroData.ALL.get(selected);
         session.startNewGame(hero);
         bus.fire(new SoundRequestEvent("ui_click", false));
-        bus.fire(new ScreenChangeEvent(getName(), "Fight", true));
+        bus.fire(new ScreenChangeEvent(getName(), "SwapSelect", true));
     }
 
     private void back() {

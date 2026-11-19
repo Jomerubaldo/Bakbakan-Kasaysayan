@@ -41,14 +41,14 @@ public class EnemyAI {
 
         double difficulty = (Math.max(1, Math.min(CombatConstants.TOTAL_ROUNDS, round)) - 1)
                 / (double) (CombatConstants.TOTAL_ROUNDS - 1);
-        this.reactionTime = 0.55 - difficulty * 0.25;
-        this.aggression = 0.45 + difficulty * 0.4;
-        this.blockChance = 0.18 + difficulty * 0.32;
-        this.duckChance = 0.12 + difficulty * 0.28;
-        this.skillChance = 0.35 + difficulty * 0.4;
+        this.reactionTime = 0.60 - difficulty * 0.22;
+        this.aggression = 0.40 + difficulty * 0.35;
+        this.blockChance = 0.15 + difficulty * 0.30;
+        this.duckChance = 0.10 + difficulty * 0.25;
+        this.skillChance = 0.30 + difficulty * 0.35;
         this.specialChance = isSoldier(self.getHero().id())
                 ? 0
-                : 0.55 + difficulty * 0.4;
+                : 0.45 + difficulty * 0.30;
     }
 
     private static boolean isSoldier(String id) {
@@ -167,6 +167,7 @@ public class EnemyAI {
         }
 
         if (self.isSpecialReady()
+                && !player.isStunned()
                 && distance <= specialRange()
                 && specialCooldown <= 0
                 && random.nextDouble() < specialChance) {
@@ -175,6 +176,7 @@ public class EnemyAI {
         }
 
         if (self.getMana() >= CombatConstants.SKILL_MANA_COST
+                && !player.isStunned()
                 && distance <= skillRange()
                 && skillCooldown <= 0
                 && random.nextDouble() < skillChance) {
@@ -209,23 +211,26 @@ public class EnemyAI {
 
     private boolean tryOffense(double distance) {
         if (self.isSpecialReady()
+                && !player.isStunned()
                 && distance <= specialRange()
                 && specialCooldown <= 0
                 && random.nextDouble() < specialChance) {
             if (self.trySpecial()) {
                 skills.castSpecial(self, player);
-                specialCooldown = 2.8;
+                specialCooldown = 3.2;
+                skillCooldown = Math.max(skillCooldown, 1.0);
                 return true;
             }
         }
 
         if (self.getMana() >= CombatConstants.SKILL_MANA_COST
+                && !player.isStunned()
                 && distance <= skillRange()
                 && skillCooldown <= 0
                 && random.nextDouble() < skillChance) {
             if (self.trySkill()) {
                 skills.castSkill(self, player);
-                skillCooldown = 1.1;
+                skillCooldown = 1.3;
                 return true;
             }
         }

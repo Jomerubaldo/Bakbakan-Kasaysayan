@@ -1,17 +1,19 @@
 package com.bakbakan.entities;
 
 import com.bakbakan.combat.CombatConstants;
+import com.bakbakan.events.DamageEvent;
 import com.bakbakan.events.GameEventBus;
 import com.bakbakan.events.ManaChangedEvent;
 import com.bakbakan.events.SkillUsedEvent;
 import com.bakbakan.events.SoundRequestEvent;
+import com.bakbakan.events.SpecialChangedEvent;
 import com.bakbakan.events.SpecialReadyEvent;
 import com.bakbakan.events.SpecialUsedEvent;
 import javafx.geometry.Rectangle2D;
 
 public class Fighter extends Entity {
 
-    private final HeroData hero;
+    private HeroData hero;
     private final boolean playerControlled;
     private final GameEventBus bus;
     private final double maxHealth;
@@ -89,10 +91,65 @@ public class Fighter extends Entity {
         walkPhase = 0;
     }
 
+    public void restoreHealthAndMana(double health, double mana) {
+        this.health = Math.max(1, Math.min(maxHealth, health));
+        this.mana = Math.max(0, Math.min(CombatConstants.MAX_MANA, mana));
+        this.manaAccumulator = 0;
+    }
+
+    public void restoreSpecial(double special) {
+        this.special = Math.max(0, Math.min(CombatConstants.MAX_SPECIAL, special));
+        this.specialReadyAnnounced = this.special >= CombatConstants.MAX_SPECIAL;
+    }
+
     public void setMoveInput(double direction, boolean duck, boolean block) {
         this.moveDirection = Math.max(-1, Math.min(1, direction));
         this.duckInput = duck;
         this.blockInput = block;
+    }
+
+    public boolean canSwapHero() {
+        return isAlive() && onGround && hitStun <= 0 && actionLock <= 0
+                && state != FighterState.ATTACK
+                && state != FighterState.SKILL
+                && state != FighterState.SPECIAL;
+    }
+
+    public void swapHero(HeroData newHero, double health, double mana,
+                         double special) {
+        if (newHero == null) {
+            return;
+        }
+        this.hero = newHero;
+        this.spriteId = null;
+        this.health = Math.max(1, Math.min(maxHealth, health));
+        this.mana = Math.max(0, Math.min(CombatConstants.MAX_MANA, mana));
+        this.special = Math.max(0, Math.min(CombatConstants.MAX_SPECIAL, special));
+        this.specialReadyAnnounced = this.special >= CombatConstants.MAX_SPECIAL;
+        this.manaAccumulator = 0;
+        this.state = FighterState.IDLE;
+        this.stateTime = 0;
+        this.attackCooldown = 0;
+        this.attackTime = 0;
+        this.actionLock = 0;
+        this.hitLanded = false;
+        this.hitStun = 0;
+        this.hitFlash = 0;
+        this.velocityX = 0;
+        this.velocityY = 0;
+        this.onGround = true;
+        this.ducking = false;
+        this.blocking = false;
+        this.duckInput = false;
+        this.blockInput = false;
+        this.moveDirection = 0;
+        fireManaChanged();
+        bus.fire(new DamageEvent(getId(), 0, health));
+        fireSpecialChanged();
+    }
+
+    public void setFacingRight(boolean facingRight) {
+        this.facingRight = facingRight;
     }
 
     public boolean tryJump() {
@@ -154,6 +211,7 @@ public class Fighter extends Entity {
 
         bus.fire(new SpecialUsedEvent(getId(), hero.id()));
         bus.fire(new SoundRequestEvent("special_" + hero.id(), false));
+        fireSpecialChanged();
         return true;
     }
 
@@ -318,12 +376,19 @@ public class Fighter extends Entity {
         }
         double before = special;
         special = Math.min(CombatConstants.MAX_SPECIAL, special + amount);
+        fireSpecialChanged();
         if (special >= CombatConstants.MAX_SPECIAL
                 && before < CombatConstants.MAX_SPECIAL
                 && !specialReadyAnnounced) {
             specialReadyAnnounced = true;
             bus.fire(new SpecialReadyEvent(getId()));
         }
+    }
+
+    private void fireSpecialChanged() {
+        bus.fire(new SpecialChangedEvent(getId(), special,
+                CombatConstants.MAX_SPECIAL,
+                special >= CombatConstants.MAX_SPECIAL - 1e-6));
     }
 
     public Rectangle2D getAttackHitbox() {
@@ -367,12 +432,26 @@ public class Fighter extends Entity {
     }
 
     public double getAttackDamage() {
-        return scaleDamage(CombatConstants.BASE_ATTACK_DAMAGE
-                + hero.damage() * CombatConstants.ATTACK_DAMAGE_SCALING);
+        double base = CombatConstants.BASE_ATTACK_DAMAGE
+                + hero.damage() * CombatConstants.ATTACK_DAMAGE_SCALING;
+        return base * damageMultiplier;
     }
 
     public double scaleDamage(double baseDamage) {
-        return baseDamage * damageMultiplier;
+        return baseDamage * getPowerMultiplier() * damageMultiplier;
+    }
+
+    public double getPowerMultiplier() {
+        return CombatConstants.SKILL_POWER_BASE
+                + hero.damage() * CombatConstants.SKILL_POWER_SCALING;
+    }
+
+    public double getDefense() {
+        return hero.defense();
+    }
+
+    public boolean isStunned() {
+        return hitStun > 0;
     }
 
     public double getCurrentHeight() {

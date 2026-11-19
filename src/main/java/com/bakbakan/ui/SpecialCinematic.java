@@ -20,8 +20,8 @@ public final class SpecialCinematic {
 
     private static final double WIDTH = GameConfig.WIDTH;
     private static final double HEIGHT = GameConfig.HEIGHT;
-    private static final double DURATION = 2.9;
-    private static final double OUTRO = 0.5;
+    private static final double DURATION = 1.7;
+    private static final double OUTRO = 0.3;
     private static final double BAR = 64;
 
     private HeroData hero;
@@ -270,7 +270,7 @@ public final class SpecialCinematic {
             gc.fillOval(px, py, 2 + s * 4, 5 + s * 9);
         }
 
-        double p = clamp01((time - 1.45) / 0.35);
+        double p = clamp01((time - 1.05) / 0.30);
         if (p > 0 && p < 1) {
             gc.setStroke(alpha(Color.WHITE, 0.75 * (1 - p) * presence));
             gc.setLineWidth(10);
@@ -326,7 +326,7 @@ public final class SpecialCinematic {
         }
 
         for (int k = 0; k < 3; k++) {
-            double p = clamp01((time - 0.55 - k * 0.18) / 0.85);
+            double p = clamp01((time - 0.35 - k * 0.14) / 0.50);
             if (p <= 0) {
                 continue;
             }
@@ -385,7 +385,7 @@ public final class SpecialCinematic {
             drawDocument(gc, px, py, 0.7 + s * 0.6, rot, 0.30 * presence);
         }
 
-        double p = clamp01((time - 0.7) / 1.1);
+        double p = clamp01((time - 0.55) / 0.7);
         if (p > 0) {
             gc.setStroke(alpha(accent, 0.55 * presence));
             gc.setLineWidth(3);
@@ -509,7 +509,7 @@ public final class SpecialCinematic {
             }
             case "luna" -> {
                 for (int k = 0; k < 3; k++) {
-                    double impact = 0.55 + k * 0.18 + 0.85;
+                    double impact = 0.38 + k * 0.14 + 0.45;
                     if (time >= impact) {
                         double e = clamp01((time - impact) / 0.55);
                         drawExplosion(gc, accent, 1040 - k * 60, 560, e, presence);
@@ -634,7 +634,7 @@ public final class SpecialCinematic {
             gc.setFill(alpha(Color.WHITE, 0.55 * start));
             gc.fillRect(0, 0, WIDTH, HEIGHT);
         }
-        double pulse = Math.max(0, 1 - Math.abs(time - 1.5) / 0.12);
+        double pulse = Math.max(0, 1 - Math.abs(time - 1.1) / 0.12);
         if (pulse > 0) {
             gc.setFill(alpha(accent, 0.18 * pulse));
             gc.fillRect(0, 0, WIDTH, HEIGHT);

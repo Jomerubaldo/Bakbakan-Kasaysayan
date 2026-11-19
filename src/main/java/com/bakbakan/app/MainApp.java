@@ -10,6 +10,7 @@ import com.bakbakan.screens.LoadingScreen;
 import com.bakbakan.screens.MainMenuScreen;
 import com.bakbakan.screens.ResultScreen;
 import com.bakbakan.screens.ScreenManager;
+import com.bakbakan.screens.SwapSelectScreen;
 import javafx.application.Application;
 import javafx.stage.Stage;
 
@@ -29,6 +30,7 @@ public class MainApp extends Application {
         screenManager.registerScreen("Loading", () -> new LoadingScreen(assets, bus));
         screenManager.registerScreen("MainMenu", () -> new MainMenuScreen(bus, assets));
         screenManager.registerScreen("HeroSelect", () -> new HeroSelectScreen(bus, session, assets));
+        screenManager.registerScreen("SwapSelect", () -> new SwapSelectScreen(bus, session, assets));
         screenManager.registerScreen("Fight", () -> new FightScreen(bus, session, assets));
         screenManager.registerScreen("RoundWin",
                 () -> new ResultScreen(bus, session, ResultScreen.Mode.ROUND_WIN));

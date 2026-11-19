@@ -3,9 +3,9 @@ package com.bakbakan.ui;
 import com.bakbakan.combat.CombatConstants;
 import com.bakbakan.events.DamageEvent;
 import com.bakbakan.events.GameEventBus;
-import com.bakbakan.events.HitEvent;
 import com.bakbakan.events.ManaChangedEvent;
 import com.bakbakan.events.RoundStartEvent;
+import com.bakbakan.events.SpecialChangedEvent;
 import com.bakbakan.events.SpecialReadyEvent;
 import com.bakbakan.events.SpecialUsedEvent;
 import com.bakbakan.events.TimeOutEvent;
@@ -31,14 +31,14 @@ public class Hud {
 
     private final String playerId;
     private final String opponentId;
-    private final String playerName;
+    private String playerName;
     private final String opponentName;
     private final double playerMaxHealth;
     private final double opponentMaxHealth;
     private final boolean opponentBoss;
     private final EventHandler<DamageEvent> damageHandler = this::onDamage;
     private final EventHandler<ManaChangedEvent> manaHandler = this::onMana;
-    private final EventHandler<HitEvent> hitHandler = this::onHit;
+    private final EventHandler<SpecialChangedEvent> specialChangedHandler = this::onSpecialChanged;
     private final EventHandler<SpecialReadyEvent> specialReadyHandler = this::onSpecialReady;
     private final EventHandler<SpecialUsedEvent> specialUsedHandler = this::onSpecialUsed;
     private final EventHandler<RoundStartEvent> roundStartHandler = this::onRoundStart;
@@ -74,13 +74,17 @@ public class Hud {
         reset();
     }
 
+    public void setPlayerName(String playerName) {
+        this.playerName = playerName;
+    }
+
     public void attach(GameEventBus bus) {
         if (attached) {
             return;
         }
         bus.register(DamageEvent.DAMAGE, damageHandler);
         bus.register(ManaChangedEvent.MANA_CHANGED, manaHandler);
-        bus.register(HitEvent.HIT, hitHandler);
+        bus.register(SpecialChangedEvent.SPECIAL_CHANGED, specialChangedHandler);
         bus.register(SpecialReadyEvent.SPECIAL_READY, specialReadyHandler);
         bus.register(SpecialUsedEvent.SPECIAL_USED, specialUsedHandler);
         bus.register(RoundStartEvent.ROUND_START, roundStartHandler);
@@ -95,7 +99,7 @@ public class Hud {
         }
         bus.unregister(DamageEvent.DAMAGE, damageHandler);
         bus.unregister(ManaChangedEvent.MANA_CHANGED, manaHandler);
-        bus.unregister(HitEvent.HIT, hitHandler);
+        bus.unregister(SpecialChangedEvent.SPECIAL_CHANGED, specialChangedHandler);
         bus.unregister(SpecialReadyEvent.SPECIAL_READY, specialReadyHandler);
         bus.unregister(SpecialUsedEvent.SPECIAL_USED, specialUsedHandler);
         bus.unregister(RoundStartEvent.ROUND_START, roundStartHandler);
@@ -155,21 +159,15 @@ public class Hud {
         }
     }
 
-    private void onHit(HitEvent event) {
-        double dealt = event.getDamage() * CombatConstants.SPECIAL_GAIN_DEALT;
-        double taken = event.getDamage() * CombatConstants.SPECIAL_GAIN_TAKEN;
-
-        if (playerId.equals(event.getAttackerId())) {
-            addPlayerSpecial(dealt);
-        }
-        if (opponentId.equals(event.getAttackerId())) {
-            addOpponentSpecial(dealt);
-        }
-        if (playerId.equals(event.getTargetId())) {
-            addPlayerSpecial(taken);
-        }
-        if (opponentId.equals(event.getTargetId())) {
-            addOpponentSpecial(taken);
+    private void onSpecialChanged(SpecialChangedEvent event) {
+        double special = clamp(event.getCurrentSpecial(), 0,
+                CombatConstants.MAX_SPECIAL);
+        if (playerId.equals(event.getFighterId())) {
+            playerSpecial = special;
+            playerSpecialReady = event.isReady();
+        } else if (opponentId.equals(event.getFighterId())) {
+            opponentSpecial = special;
+            opponentSpecialReady = event.isReady();
         }
     }
 
@@ -191,16 +189,6 @@ public class Hud {
             opponentSpecial = 0;
             opponentSpecialReady = false;
         }
-    }
-
-    private void addPlayerSpecial(double amount) {
-        playerSpecial = clamp(playerSpecial + amount, 0, CombatConstants.MAX_SPECIAL);
-        playerSpecialReady = playerSpecial >= CombatConstants.MAX_SPECIAL;
-    }
-
-    private void addOpponentSpecial(double amount) {
-        opponentSpecial = clamp(opponentSpecial + amount, 0, CombatConstants.MAX_SPECIAL);
-        opponentSpecialReady = opponentSpecial >= CombatConstants.MAX_SPECIAL;
     }
 
     public void render(GraphicsContext gc) {

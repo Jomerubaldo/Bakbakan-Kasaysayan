@@ -46,13 +46,14 @@ $env:JAVA_HOME = "C:\Program Files\Java\jdk-21.0.12.1"
 | `K` | Skill (costs 30 mana) |
 | `L` (hold) | Block |
 | `E` | Special (requires a full special bar) |
+| `1` / `2` / `3` | Swap to one of the three pre-selected battle heroes |
 | `Esc` or `P` | Pause / resume |
 | `Enter` / `Space` | Confirm menu selection |
 | Mouse | Hover and click menus, cards, and pause buttons |
 
 ## Game Flow
 
-`Loading` -> `MainMenu` -> `HeroSelect` -> `Fight` -> result screen.
+`Loading` -> `MainMenu` -> `HeroSelect` -> `SwapSelect` -> `Fight` -> result screen.
 
 - Win rounds 1-4: `RoundWin` -> next round.
 - Lose any round: `GameOver` -> Continue restarts from Round 1.

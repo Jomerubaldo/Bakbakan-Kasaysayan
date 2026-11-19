@@ -14,8 +14,8 @@ public record BossData(
         String spriteId) {
 
     public static final String BOSS_ID = "final_boss";
-    public static final double DEFAULT_BOSS_HEALTH = 160;
-    public static final double DEFAULT_BOSS_DAMAGE_MULTIPLIER = 1.35;
+    public static final double DEFAULT_BOSS_HEALTH = 120;
+    public static final double DEFAULT_BOSS_DAMAGE_MULTIPLIER = 1.18;
 
     private static final List<BossData> ALL = List.of(
             new BossData(
@@ -80,7 +80,7 @@ public record BossData(
                 name,
                 weapon,
                 description,
-                55, 95, 70, 70, 60,
+                52, 72, 70, 50, 55,
                 primaryColor,
                 accentColor);
     }

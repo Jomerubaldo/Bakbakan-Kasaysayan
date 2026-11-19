@@ -6,13 +6,15 @@
 - Window 1280x720, Canvas-based rendering, AnimationTimer game loop with delta time (cap dt at 0.05s).
 
 2. SCREENS / FLOW
-Loading -> Main Menu (Play, Quit) -> Hero Select (5 heroes, stats preview, mouse + keyboard) -> Fight -> (Pause overlay) -> Round Win screen ("You Win! Round cleared! Keep the streak alive." then Next Round) / Game Over screen ("You Lose! They got you this time. Get up and run it back!" with Continue = restart from Round 1, and Main Menu) / Final Victory screen after beating Round 5 ("Victory! Boss defeated! Your hero's legend is complete.").
+Loading -> Main Menu (Play, Quit) -> Hero Select (5 heroes, stats preview, mouse + keyboard) -> Swap Select (pick exactly 3 of the same 5 heroes as in-battle swap options) -> Fight -> (Pause overlay) -> Round Win screen ("You Win! Round cleared! Keep the streak alive." then Next Round) / Game Over screen ("You Lose! They got you this time. Get up and run it back!" with Continue = restart from Round 1, and Main Menu) / Final Victory screen after beating Round 5 ("Victory! Boss defeated! Your hero's legend is complete.").
 
 3. CONTROLS
-A/D move, Space jump, S duck (hold), J basic attack, K skill (costs mana), L block (hold), R special (needs full special bar), Esc or P pause/resume, Enter/mouse for menus.
+A/D move, Space jump, S duck (hold), J basic attack, K skill (costs mana), L block (hold), R special (needs full special bar), Tab swaps to a random one of the three pre-selected battle heroes (never the current hero) with a 5-second cooldown, Esc or P pause/resume, Enter/mouse for menus.
 
 4. RULES
-- Health 100 for both fighters, reset every round. Mana max 100, regenerates automatically every second; skill (K) costs mana and is blocked if mana is insufficient.
+- Health 100, mana max 100 regenerating automatically every second; skill (K) costs mana and is blocked if mana is insufficient. The enemy resets every round. Every player hero keeps its own health, mana, and special for the whole run: damage, mana spent, and special-bar progress in round 1 persist through rounds 2-5 and the final boss, and swapping out and back restores that hero's stored values instead of healing or resetting. Only a new game restores everyone to full health/mana and an empty special bar.
+- The first time a hero enters a run they arrive at full health and mana with an empty special bar. The swap plays an entrance move where the new hero drops from above, flying-kicks the enemy, and lands on the battlefield; combat pauses during the entrance.
+- The player fields a team made of the three chosen swap heroes. Swapping has a 5-second cooldown that starts when the swap begins; it never blocks the automatic KO swap. When the active hero is KO'd, a living teammate is automatically swapped in and the round continues; the player is only defeated when all three team heroes are down (0 HP). Fallen heroes stay down for the rest of the run and cannot be swapped in.
 - Special bar 0-100: fills when dealing and receiving damage. At 100 show "SPECIAL READY"; pressing R uses the hero's special and resets the bar to 0.
 - Block reduces melee damage by 70%. Ducking avoids high projectiles.
 - Round timer 1:00. On timeout the fighter with higher health wins; a tie counts as a loss for the player.
@@ -48,7 +50,7 @@ FINAL BOSS (put in one easy-to-edit BossData config; historically accurate per s
 
 7. ARCHITECTURE (EVENT-DRIVEN, MANDATORY)
 - Packages under com.bakbakan: app, screens, entities, combat, ai, events, audio, assets, ui, util.
-- Custom events extend javafx.event.Event, each with its own EventType: HitEvent, DamageEvent, ManaChangedEvent, SpecialReadyEvent, SpecialUsedEvent, SkillUsedEvent, RoundStartEvent, RoundEndEvent, TimerTickEvent, TimeOutEvent, FighterDefeatedEvent, GameOverEvent, VictoryEvent, PauseEvent, ResumeEvent, ScreenChangeEvent, SoundRequestEvent.
+- Custom events extend javafx.event.Event, each with its own EventType: HitEvent, DamageEvent, ManaChangedEvent, SpecialChangedEvent, SpecialReadyEvent, SpecialUsedEvent, SkillUsedEvent, RoundStartEvent, RoundEndEvent, TimerTickEvent, TimeOutEvent, FighterDefeatedEvent, PlayerHeroDownEvent, GameOverEvent, VictoryEvent, PauseEvent, ResumeEvent, ScreenChangeEvent, SoundRequestEvent.
 - A central GameEventBus (register/unregister EventHandler per EventType, fire). HUD, AudioManager, RoundManager and ScreenManager must communicate through events, not direct calls.
 - Also use standard JavaFX events: KeyEvent (setOnKeyPressed/Released), MouseEvent (menu buttons hover/click), ActionEvent, WindowEvent (close request).
 - Maintain docs/EVENTS.md: a table of event name | fired by | handled by | purpose.
